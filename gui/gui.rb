@@ -1,0 +1,642 @@
+﻿$:.unshift File.dirname($0)
+
+require 'Qt'
+require '../lib/vk.rb'
+require '../lib/sugar_vk.rb'
+require './highlighter_ruby.rb'
+require './help.rb'
+require 'pathname'
+
+include Vkontakte
+
+Vkontakte::application_directory = File.expand_path("../..")
+
+
+$mutex = Mutex.new
+$app = Qt::Application.new(ARGV)
+
+
+class SocialRobot < Qt::MainWindow
+	slots    'open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
+
+	#Create gui and set timer
+	def initialize()
+		super
+		setWindowTitle("Социальный робот - #{IO.read("../version.txt")}")
+		setWindowIcon(Qt::Icon.new("images/logo.png"))
+		#Create main widgets and dock interface 
+		resize(800, 600)
+		log_dock = Qt::DockWidget.new("Лог", self)
+		help_dock = Qt::DockWidget.new("Помощь", self)
+
+		@code_edit = Qt::TextEdit.new
+		HighlighterRuby.new(@code_edit.document)
+		@code_edit.plainText = "#Список друзей\nme.friends.print"
+		@log_edit = Qt::TextEdit.new
+		@help_tree = Qt::TreeWidget.new
+
+
+		#Properties of main widgets
+		@code_edit.setStyleSheet("font: 15px;")
+		connect(@code_edit,SIGNAL('textChanged()'),self,SLOT('code_changed()'))
+		@code_edit.acceptRichText = false
+		@code_edit.lineWrapMode = 0
+		@log_edit.lineWrapMode = 0
+		@log_edit.ReadOnly = true
+
+
+		setCentralWidget(@code_edit)
+
+		#Assign widgets to docks
+		log_dock.widget = @log_edit
+			addDockWidget(Qt::BottomDockWidgetArea, log_dock)
+		help_dock.widget = @help_tree
+			addDockWidget(Qt::RightDockWidgetArea, help_dock)
+
+
+
+		#Allow dock widgets to be movable
+		log_dock.Features = 2
+		help_dock.Features = 2
+
+
+		#Fill help tree
+		index = 0
+		
+		items = []
+		$help.keys.each do |help_chapter_key|
+		    item_chapter = Qt::TreeWidgetItem.new(@help_tree)
+			item_chapter.setFont(0, Qt::Font.new("Times", 11, Qt::Font::Light))
+			help_chapter_key_copy = help_chapter_key.dup
+			help_chapter_key_copy.force_encoding("UTF-8")
+			item_chapter.setText(0, help_chapter_key_copy)
+			$help[help_chapter_key].inject(items) do |array,function|
+				item = Qt::TreeWidgetItem.new(item_chapter)
+
+				#Zebra
+				if(index % 2 == 0)
+					brush = Qt::Brush.new(Qt::Color.new(230, 230, 230))
+					item.setBackground(0,brush)
+					item.setBackground(1,brush)
+				end
+				if function.has_key?("data")
+					data = function["data"]
+					data.force_encoding("UTF-8")
+					item.setData(0,32,Qt::Variant.new(data)) 
+				end
+				signature = function["signature"]
+				signature.force_encoding("UTF-8")
+				item.setText(0, signature)
+				description = function["description"]
+				description.force_encoding("UTF-8")
+				item.setText(1, description)
+				item.setFont(0, Qt::Font.new("Times", 10, Qt::Font::Bold))
+				first = true
+				function["tips"].each do |hash|
+					item_internal = Qt::TreeWidgetItem.new(item)
+					signature = hash["signature"]
+					signature.force_encoding("UTF-8")
+					description = hash["description"]
+					description.force_encoding("UTF-8")
+					
+					item_internal.setText(0, ((first)? "\n":"") + signature + "\n")
+					item_internal.setText(1, ((first)? "\n":"") + description + "\n")
+					if hash.has_key?("data")
+						data = hash["data"]
+						data.force_encoding("UTF-8")
+						item_internal.setData(0,32,Qt::Variant.new(data)) 
+					end
+					first = false
+				end
+				index += 1
+				array.push(item)
+			end
+		end
+		#Properties of help tree
+		@help_tree.setColumnCount(2)
+		headers = []
+		headers << "Название" << "Описание"
+		@help_tree.HeaderLabels = (headers);
+		@help_tree.setColumnWidth(0,200) 
+		@help_tree.setColumnWidth(1,300) 
+		@help_tree.WordWrap = true
+
+		connect(@help_tree,SIGNAL('itemClicked ( QTreeWidgetItem *, int)'),self,SLOT('insert_help(QTreeWidgetItem *, int)'))
+		@help_tree.insertTopLevelItems(0,items)
+
+
+		#Create actions
+		@new_action = Qt::Action.new(Qt::Icon.new("images/new.png"), "Новый скрипт",self)
+		@new_action.shortcut = Qt::KeySequence.new("Ctrl+N")
+		@new_action.statusTip = "Создать скрипт"
+		connect(@new_action, SIGNAL('triggered()'), self, SLOT('create_script()'))
+
+		@save_action = Qt::Action.new(Qt::Icon.new("images/save.png"), "Сохранить", self)
+		@save_action.shortcut = Qt::KeySequence.new("Ctrl+S")
+		@save_action.statusTip = "Сохранить скрипт"
+		connect(@save_action, SIGNAL('triggered()'), self, SLOT('save_script()'))
+
+		@open_action = Qt::Action.new(Qt::Icon.new("images/open.png"), "Открыть", self)
+		@open_action.shortcut = Qt::KeySequence.new("Ctrl+O")
+		@open_action.statusTip = "Открыть скрипт"
+		connect(@open_action, SIGNAL('triggered()'), self, SLOT('open_script()'))
+
+		@run_action = Qt::Action.new(Qt::Icon.new("images/run.png"), "Запуск", self)
+		@run_action.shortcut = Qt::KeySequence.new("F5")
+		@run_action.statusTip = "Запустить скрипт"
+		connect(@run_action, SIGNAL('triggered()'), self, SLOT('run_script()'))
+
+		@stop_action = Qt::Action.new(Qt::Icon.new("images/stop.png"), "Стоп", self)
+		@stop_action.statusTip = "Остановить скрипт"
+		connect(@stop_action, SIGNAL('triggered()'), self, SLOT('stop_script()'))
+
+		@loot_action = Qt::Action.new(Qt::Icon.new("images/loot.png"), "Скачанные файлы", self)
+		@loot_action.statusTip = "Посмотреть скачанные файлы"
+		connect(@loot_action, SIGNAL('triggered()'), self, SLOT('show_loot()'))
+
+		@kill_session_action = Qt::Action.new("Очистить сессию", self)
+		@kill_session_action.statusTip = "Очистить сессию"
+		connect(@kill_session_action, SIGNAL('triggered()'), self, SLOT('kill_session()'))
+
+		
+		
+		@exit_action = Qt::Action.new("Выход", self)
+	    @exit_action.shortcut = Qt::KeySequence.new("Ctrl+Q")
+	    @exit_action.statusTip = "Выйти"
+	    connect(@exit_action, SIGNAL('triggered()'), $app, SLOT('closeAllWindows()'))
+		
+		
+		@fileMenu = menuBar().addMenu("Файл")
+		@fileMenu.addAction(@new_action)
+		@fileMenu.addAction(@save_action)
+		@fileMenu.addAction(@open_action)
+		@fileMenu.addAction(@run_action)
+		@fileMenu.addAction(@stop_action)
+    	@fileMenu.addAction(@loot_action)
+	    @fileMenu.addAction(@kill_session_action)
+		@fileMenu.addAction(@exit_action)
+		
+		generate_menu(menuBar(),'../prog')
+		generate_menu(menuBar().addMenu("Мои скрипты"),'../../my')
+		
+		
+		file_toolbar = addToolBar("File")
+		file_toolbar.addAction(@new_action)
+		file_toolbar.addAction(@save_action)
+		file_toolbar.addAction(@open_action)
+
+		run_toolbar = addToolBar("Run")
+		run_toolbar.addAction(@run_action)
+		run_toolbar.addAction(@stop_action)
+
+
+		statusBar().showMessage("")
+
+		#Comunication variables
+
+		#Lines to add to log
+		@new_lines = []
+
+		#Working thread
+		@thread = nil
+
+		#Disable stop button, enable start button
+		run_gui true
+
+		#Trigger to run_gui(true)
+		@disable_run_gui = false
+
+		#If code has changed
+		@changed = false
+		
+		#Proxy to call user gui dialog from script
+		@res_proxy = []
+		@ask_proxy = {}
+
+		#On iddle 
+		block = Proc.new do
+			$mutex.synchronize {
+				@new_lines.each {|line| @log_edit.append(line)}
+				@new_lines = []
+			}
+			if(@disable_run_gui)
+				run_gui(true)
+				@disable_run_gui = false
+			end
+			if @ask_proxy.length > 0
+				@res_proxy = ask_user_internal(@ask_proxy)
+				@ask_proxy = []
+			end
+			
+			Thread.pass
+		end
+		
+		#Give chance to work for another threads  
+		@timer=Qt::Timer.new(window)
+		invoke=Qt::BlockInvocation.new(@timer, block, "invoke()")
+		Qt::Object.connect(@timer, SIGNAL("timeout()"), invoke, SLOT("invoke()"))
+		@timer.start
+
+		log_small("Добро пожаловать мастер. Готов служить ...")
+	end
+	
+	#Generate menu
+	def generate_menu(menu,directory)
+		Pathname.new(directory).children.each do |e|  
+			if e.directory?
+				generate_menu(menu.addMenu(e.basename().to_s),e.to_s)
+				
+			else
+				new_action = Qt::Action.new(Qt::Icon.new("images/script.png"),e.basename(".rb").to_s, self)
+				new_action.statusTip = e.basename(".rb").to_s
+				new_action.setData(Qt::Variant.new(e.to_s))
+				connect(new_action, SIGNAL('triggered()'), self, SLOT('menu_script_click()'))
+				menu.addAction(new_action)
+				
+			end
+		end
+	end
+	
+	#Clicked on some auto generated menu
+	def menu_script_click
+		return unless check_changes
+		str = sender.data.toString
+		str.force_encoding("UTF-8")
+		text = IO.read(str)
+		text.force_encoding("UTF-8")
+		@code_edit.plainText = text
+	end
+	
+	#Open loot folder
+	def show_loot
+		path = Qt::Dir::toNativeSeparators(File.expand_path(Vkontakte::loot_directory));
+		Qt::DesktopServices::openUrl(Qt::Url.new("file:///#{path}"));
+	end
+
+
+	#Log with red color
+	def log_error(text)
+		text = text.to_s
+		text.force_encoding("UTF-8")
+		$mutex.synchronize {
+			@new_lines << ("<font color='red'>" + text + "</font>")
+		}
+	end
+
+	#Log with green color
+	def log_success(text)
+		text = text.to_s
+		text.force_encoding("UTF-8")
+		$mutex.synchronize {
+			@new_lines << ("<font color='green'>" + text + "</font>")
+		}
+	end
+
+	#Log with black color
+	def log_ok(text)
+		text = text.to_s
+		text.force_encoding("UTF-8")
+		$mutex.synchronize {
+			
+			@new_lines << text
+		}
+	end
+
+	#Log with small grey font
+	def log_small(text)
+		text = text.to_s
+		text.force_encoding("UTF-8")
+		$mutex.synchronize {
+			@new_lines << ("<font color='grey'><small>" + text + "</small></font>")
+		}
+	end
+
+	#Ask if discard code edit changes or not
+	def check_changes
+		return true if !@changed || @code_edit.plainText.length == 0
+		msgBox = Qt::MessageBox.new
+		msgBox.setText("Скрипт не сохранен.")
+		msgBox.setInformativeText("Все равно продолжить?")
+		msgBox.setStandardButtons(Qt::MessageBox::Ok | Qt::MessageBox::Cancel)
+		msgBox.setDefaultButton(Qt::MessageBox::Cancel)
+		res = msgBox.exec() == Qt::MessageBox::Ok
+		@changed = false if res
+		res
+	end
+
+	#On close
+	def closeEvent(event)
+		check = check_changes
+		if check
+			event.accept()
+		else
+			event.ignore()
+		end
+	end
+
+	#On help tree clicked
+	def insert_help(item,column)
+		data = item.data(0,32).toString
+		return unless data
+		data.force_encoding("UTF-8")
+		@code_edit.insertPlainText(data)
+	end
+
+	#On kill session clicked
+	def kill_session
+		@me = nil
+		File.delete(Vkontakte::session_file)
+	end
+
+	
+	#On create script clicked
+	def create_script
+		return unless check_changes 
+		@code_edit.clear
+	end
+
+	#On save script clicked
+	def save_script
+		filename = Qt::FileDialog.getSaveFileName(self, "Сохранить скрипт", "../../my", "Скрипты (*.rb);; Все файлы (*.*)")
+		return unless filename
+		filename.force_encoding("UTF-8")
+		begin
+			f = File.open(filename,"w")
+			f << @code_edit.plainText
+			f.close
+			@changed = false
+		rescue Exception => e
+			msg = Qt::MessageBox.new
+			msg.setText("Ошибка : #{e.message.encode("UTF-8")}")
+			msg.exec()
+		end
+	end
+
+	#On open script clicked
+	def open_script
+		return unless check_changes 
+		filename = Qt::FileDialog.getOpenFileName(self, "Открыть скрипт", "../../my", "Скрипты (*.rb);; Все файлы (*.*)")
+		return unless filename
+		filename.force_encoding("UTF-8")
+		begin
+			content = IO.read(filename)
+			content.force_encoding("UTF-8")
+			@code_edit.plainText = content
+			@changed = false
+		rescue Exception => e
+			msg = Qt::MessageBox.new
+			msg.setText("Ошибка : #{e.message.encode("UTF-8")}")
+			msg.exec()
+		end
+	end
+
+	#On stop script clicked
+	def stop_script
+		@thread.kill if @thread
+		run_gui(true)
+		log_error("Остановлено")
+	end
+
+	#Toggle start/stop buttons
+	def run_gui(enable)
+		@stop_action.setEnabled(!enable)
+		@run_action.setEnabled(enable)
+	end
+
+	#On run script clicked
+	def run_script
+		return if @thread && @thread.alive?
+		@log_edit.html = "Запуск..."
+		
+		s = @code_edit.plainText
+		s.force_encoding("UTF-8")
+		@thread = Thread.new(s,self) do |script,robot|
+			begin
+				log do |text|
+				robot.log_ok text
+			end
+			me
+			eval(script)
+			robot.log_success "Выполнено"
+			@disable_run_gui = true
+			rescue Exception => e  
+				robot.log_error e.message 
+				e.backtrace.each{|l|robot.log_small l} 
+				@disable_run_gui = true
+			end
+		end
+		run_gui(false)
+	end
+
+
+	#On code text box changed
+	def code_changed
+		@changed = true
+	end
+	
+	
+	#Create universal dialog
+	def ask(params = {})
+		@res_proxy = []
+		@ask_proxy = params
+		while(true) do
+			if(@res_proxy.length >0)
+				res = @res_proxy
+				@res_proxy = []
+				return res
+			end
+			sleep 0.1
+		end
+	end
+	
+	#Shortcut to ask
+	def ask_string(str = "Введите строку")
+		ask(str => "string")[0]
+	end
+	
+	#Shortcut to ask
+    def ask_file(str = "Выберите файл")
+		ask(str => "file")[0]
+	end
+	
+	#Shortcut to ask
+    def ask_int(str = "Введите число")
+		ask(str => "int")[0]
+	end
+	
+	#Shortcut to ask
+    def ask_files(str = "Выберите файлы")
+		ask(str => "files")[0]
+	end
+
+	
+	
+	
+	#Create universal dialog thread unsafe
+	def ask_user_internal(params = {})
+		@timer.stop
+		ask = Qt::Dialog.new
+		layout = Qt::GridLayout.new  
+		index = 0
+		controls = []
+		@controls_hash = {}
+		params.each_key do |param| 
+			
+			label = Qt::Label.new
+			param_real = param.dup
+			param_real.force_encoding("UTF-8")
+			label.text = param_real
+			case params[param]
+				when "string"
+					input = Qt::LineEdit.new
+					
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				when "int"
+					input = Qt::SpinBox.new
+					input.minimum = 0
+					input.value = 1
+					
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				when "pass"
+					input = Qt::LineEdit.new
+					input.EchoMode = Qt::LineEdit::Password
+			
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				when "files"
+					hlayout = Qt::HBoxLayout.new
+					input = Qt::LineEdit.new
+					button = Qt::PushButton.new
+					@controls_hash[button] = input
+					button.text = "..."
+					
+					hlayout.addWidget(input)
+					hlayout.addWidget(button)
+					connect(button,SIGNAL('clicked()'),self,SLOT('open_files_clicked()'))
+					controls.push(button)
+					layout.addLayout(hlayout,index,1)
+				when "file"
+					hlayout = Qt::HBoxLayout.new
+					input = Qt::LineEdit.new
+					button = Qt::PushButton.new
+					@controls_hash[button] = input
+					button.text = "..."
+					
+					hlayout.addWidget(input)
+					hlayout.addWidget(button)
+					connect(button,SIGNAL('clicked()'),self,SLOT('open_file_clicked()'))
+					controls.push(input)
+					layout.addLayout(hlayout,index,1)
+				else
+					input = Qt::LineEdit.new
+					
+			end
+			
+			
+			
+			
+			layout.addWidget(label,index,0)
+			
+			
+			index += 1
+		end
+		exit_button = Qt::PushButton.new("Ок",ask)
+		layout.addWidget(exit_button,index,1,Qt::AlignRight)
+		connect(exit_button,SIGNAL('clicked()'),ask,SLOT('accept()'))
+		
+		
+		layout.setContentsMargins(50,50,50,50)
+		layout.HorizontalSpacing = 75
+		layout.VerticalSpacing = 30
+		ask.windowTitle = "Введите значения"
+		ask.setLayout(layout)
+		ask.exec
+		res = []
+		controls.each do |control|
+			
+			case control.class.name
+				when /LineEdit/
+					push_value = (control.text)
+					push_value.force_encoding("UTF-8")
+					res.push(push_value)
+				when /SpinBox/
+					res.push(control.value)
+				when /PushButton/
+					text = @controls_hash[control].text
+					text.force_encoding("UTF-8")
+					res.push(text.split("|"))
+				
+			end
+		end
+		
+		@timer.start
+		res
+	end
+	
+	#On files open dialog clicked while asking
+	def open_files_clicked
+		
+		filename = Qt::FileDialog.getOpenFileNames(self, "Открыть файлы", "../../loot", "Все файлы (*.*)").map{|f|f.force_encoding("UTF-8")}.join("|")
+		return if filename.length == 0
+		
+		@controls_hash[sender].text = filename
+	end
+	
+	#On files open dialog clicked while asking
+	def open_file_clicked
+		filename = Qt::FileDialog.getOpenFileName(self, "Открыть файл", "../../loot", "Все файлы (*.*)")
+		return unless filename
+		filename.force_encoding("UTF-8")
+		
+		@controls_hash[sender].text = filename
+	end
+	
+	
+	#Login user try many variants of login
+	#If credentials fails - exception
+	def login(*params)
+		if(params.length==2)
+			res = User.new.login(params[0],params[1]) 
+			return res if res
+			raise "Не правильный логин/пароль"
+		end
+		if(params.length==0)
+			res = User.new.login_from_session
+			return res if res
+			res = ask("Логин"=>"string","Пароль"=>"pass")
+			res = User.new.login(res[0],res[1])
+			raise "Не правильный логин/пароль" unless res
+			return res
+		end
+	end
+	
+	#Access to User self object
+	def me
+		return @me if @me
+		@me = login
+	end
+	
+end
+
+widget = SocialRobot.new
+
+widget.show
+
+splash = "../splash/pid.txt"
+ if File.exist?(splash)
+	begin
+		Process.kill "KILL", IO.read(splash).to_i
+	rescue
+	end
+	File.delete(splash)
+ end
+	
+$app.exec
+
+
+
+
+
+
