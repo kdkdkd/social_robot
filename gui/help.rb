@@ -82,6 +82,14 @@
 	}],
 	"Люди" => [
 	{
+		"signature" => "User.name", "data" => '.name', "description" => "Имя пользователя", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Мое имя" , "data" => "me.name.print", "description" => "me.name.print"},
+			{"signature" => "Функция Возвращает", "description" => "String"}
+		]
+	},
+	{
 		"signature" => "User.id", "data" => '.id', "description" => "Идентификатор пользователя", 
 		"tips" => 
 		[
@@ -95,6 +103,14 @@
 		[
 			{"signature" => "Пример. Кто под первым номером?" , "data" => "User.id(1).name.print", "description" => "User.id(1).name.print"},
 			{"signature" => "Функция Возвращает", "description" => "User"}
+		]
+	},
+	{
+		"signature" => "User.deleted", "data" => '.deleted', "description" => "Заблокирован ли пользователь", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Мой профайл заблокировали?" , "data" => "me.deleted.print", "description" => "me.deleted.print"},
+			{"signature" => "Функция Возвращает", "description" => "Bool"}
 		]
 	},
 	{

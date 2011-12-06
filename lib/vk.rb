@@ -4,10 +4,44 @@ require 'json'
 
 module Vkontakte
 
+	#Output message from system
 	def log(*args, &block)
 		@@log_block = block if block
 		@@log_block.call args[0] if args.length>0 && @@log_block
 	end
+	
+	
+	
+	#Ask user to resolve captcha
+	def ask_captcha(*args, &block)
+		@@ask_captcha_block = block if block
+		@@ask_captcha_block.call args[0] if args.length>0 && @@ask_captcha_block
+	end
+	
+	#Ask user to login
+	def ask_login(*args, &block)
+		if block
+			@@ask_login_block = block 
+		else
+			@@ask_login_block.call if @@ask_login_block
+		end
+	end
+	
+	#Try to login in any way
+	def forсe_login(connector)
+		connect = nil
+		if connector
+			connect = connector.connect
+		else
+			connect = Vkontakte::last_connect
+		end
+		unless connect && connect.login
+			ask_login 
+			connect = Vkontakte::last_connect
+		end
+		connect
+	end
+		
 	
 	@@application_directory = "."
 	
@@ -25,6 +59,10 @@ module Vkontakte
 	
 	def session_file
 		File.join(Vkontakte::application_directory,"session","session.txt")
+	end
+	
+	def convert_exe
+		File.join(Vkontakte::application_directory,"magick","convert.exe")
 	end
 	
 	def last_connect=(val)
@@ -63,14 +101,27 @@ module Vkontakte
 		#Check if connection is ok
 		def check_login
 			begin
-				id = get("/feed").scan(/id\:\s*([^\,]*)\,/)[0][0]
+				resp = get("/feed")
+				id = resp.scan(/id\:\s*([^\,]*)\,/)[0][0]
 				@uid = id
 				return id
 			rescue
-				
 				return false
 			end
 		end
+		
+		def ask_captcha_internal(captcha_sid)
+			file_name = save("http://vkontakte.ru/captcha.php?sid=#{captcha_sid}&s=1","captcha","#{captcha_sid}.jpg")
+			file_name_png = file_name.gsub(".jpg",".png")
+			command = "\"#{Vkontakte::convert_exe}\" \"#{file_name}\" \"#{file_name_png}\""
+			system(command)
+			captcha_key = ask_captcha(captcha_sid)
+			File.delete file_name
+			File.delete file_name_png
+			captcha_key
+		end
+		
+		
 		
 		#Save some file to loot folder
 		def save(url,folder,filename)
@@ -81,7 +132,9 @@ module Vkontakte
 			ext = File.extname(filename)
 			basename = filename.chomp(ext)
 			basename = basename[0..99] + "..." if basename.length>100
-			@agent.get(url).save(File.join(path,basename + "." + ext))
+			res = File.join(path,basename + ext)
+			@agent.get(url).save(res)
+			res
 		end
 		
 		#Make GET request
@@ -91,6 +144,30 @@ module Vkontakte
 			res = res.encode("utf-8")
 			res
 		end
+		
+		#Fetch user page
+		def get_user(id)
+			if(@last_user_fetch_date)
+				diff = Time.new - @last_user_fetch_date
+				sleep(2.1 - diff) if(diff<2.1)
+			end
+			
+			not_ok = true			
+			sleep_time = 100
+			while not_ok do
+				res = get("/id" + id)
+				
+				if(res.index('"post_hash"') || res.index('"profile_deleted_text"'))
+					not_ok = false
+				else
+					sleep sleep_time
+					sleep_time *= 10
+				end
+			end
+			@last_user_fetch_date = Time.new
+			res
+		end
+		
 		
 		#Add vkontakte.ru to address
 		def addr(rel = "")
@@ -203,14 +280,7 @@ module Vkontakte
 		
 		
 		def Music.all(q, connector=nil)
-		    connect = nil
-			if connector
-				connect = connector.connect
-			else
-				connect = Vkontakte::last_connect
-			end
-			return false unless connect && connect.login
-			
+		    connect = forсe_login(connector)
 			
 			html = Nokogiri::HTML(connect.post('/al_search.php',{"al" => "1", "c[q]" => q, "c[section]" => "audio", "c[sort]" => "2"}).split("<!>")[6].gsub("<!-- ->->",""))
 			res = []
@@ -235,13 +305,7 @@ module Vkontakte
 		end
 		
 		def Music.upload(file, connector=nil)
-			connect = nil
-			if connector
-				connect = connector.connect
-			else
-				connect = Vkontakte::last_connect
-			end
-			return false unless connect && connect.login
+			connect = forсe_login(connector)
 			
 			res_total = nil
 			if(file.class.name == "Array")
@@ -299,6 +363,18 @@ module Vkontakte
 			@name
 		end
 		
+		def deleted
+			return @deleted if @deleted == true || @deleted == false
+			info
+			@deleted
+		end
+		
+		def post_hash
+			return @post_hash if @post_hash
+			info
+			@post_hash
+		end
+		
 		def set(id,name=nil,connect=nil)
 			@id = id.to_s
 			@name = name
@@ -308,7 +384,9 @@ module Vkontakte
 		end
 		
 		def User.id(id_set)
-			User.new.set(id_set)
+			res = User.new.set(id_set)
+			res.connect = forсe_login(nil)
+			res
 		end
 		
 		def User.login(login,pass)
@@ -368,17 +446,27 @@ module Vkontakte
 		end
 		
 		def info
+			return @info if @info
 			return false unless @connect.login
 			log "Fetching info..."
-			resp = @connect.get('/id' + @id.to_s)
+			resp = @connect.get_user(@id.to_s)
 			html = Nokogiri::HTML(resp)
 			name_new = html.xpath("//title").text
 			@name = name_new
+			
+			@deleted = html.xpath("//div[@class='profile_deleted']").length==1
+			if @deleted
+				@post_hash = nil
+				@info = {}
+				return
+			end
+			@post_hash = resp.scan(/\"post_hash\"\:\"([^\"]*)\"/)[0][0]
+			
 			hash = {"статус" => html.xpath("//div[@id='profile_current_info']").text}
 			h1 = html.xpath("//div[@class='label fl_l']").map{|div| div.text}
 			h2 = html.xpath("//div[@class='labeled fl_l']").map{|div| div.text}
 			h1.each_with_index{|name,index| hash[name.chomp(":")] = h2[index]}
-			hash
+			@info = hash
 		end
 		
 		def music
@@ -398,8 +486,58 @@ module Vkontakte
 				array
 			end
 		end
+		
+		
+		def post(msg)
+			return false unless @connect.login
+			log "Posting ..."
+			captcha_sid = nil
+			captcha_key = nil
+            while true
+				hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id, "type" => "all" }
+				unless(captcha_key.nil?)
+					hash["captcha_sid"] = captcha_sid
+					hash["captcha_key"] = captcha_key
+				end
+				res = @connect.post('/al_wall.php', hash)
+				if(res.index("<!json>"))
+					break
+				else
+					a = res.split("<!>")
+					captcha_sid = a[a.length-2]
+					captcha_key = @connect.ask_captcha_internal(captcha_sid)
+				end
+			end
+		end
+		
+		def mail(message, title = "")
+			return false unless @connect.login
+			log "Mailing ..."
+			chas = @connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0][0]
+			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
+			chas.reverse!
 
+			captcha_sid = nil
+			captcha_key = nil
+            while true
+				hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
+				unless(captcha_key.nil?)
+					hash["captcha_sid"] = captcha_sid
+					hash["captcha_key"] = captcha_key
+				end
+				res = @connect.post('/al_mail.php', hash)
+				if(res.index("<div"))
+					break
+				else
+					a = res.split("<!>")
+					captcha_sid = a[a.length-2]
+					captcha_key = @connect.ask_captcha_internal(captcha_sid)
+				end
+			end
+		end
 	end
+	
+	
 
 	class Album
 		attr_accessor :id, :user, :name, :connect
@@ -432,13 +570,8 @@ module Vkontakte
 		end
 		
 		def Album.create(name, description, connector=nil)
-			connect = nil
-			if connector
-				connect = connector.connect
-			else
-				connect = Vkontakte::last_connect
-			end
-			return false unless connect && connect.login
+			connect = forсe_login(connector)
+			
 			log "Creating album ..."
 			hash = connect.post('/al_photos.php',{"al" => "1", "act" => "new_album_box"}).scan(/hash\:\s*\'([^\']+)\'/)[0][0]
 			res = connect.post('/al_photos.php',{"al" => "1", "act" => "new_album", "comm" => "0", "view" => "0", "only" => "false" , "oid" => connect.uid, "title" => name, "desc" => description, "hash" => hash })
@@ -448,6 +581,7 @@ module Vkontakte
 		
 		
 		def upload(file,description)
+			return false unless @connect.login
 			res_total = nil
 			
 			if(file.class.name == "Array")
@@ -574,3 +708,10 @@ module Vkontakte
 
 end
 
+#eab1838b06b85aa0c5dcad6a1
+#c0aa58b60b8381a6da
+
+#		(hash.substr(hash.length-5)+hash.substr(4,hash.length-12));
+#66ed838b06b85aa0c0b8ad6a1
+#ad6a1838b06b85aa0c
+#c0aa58b60b8381a6da

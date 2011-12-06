@@ -4,10 +4,12 @@ require 'Qt'
 require '../lib/vk.rb'
 require '../lib/sugar_vk.rb'
 require './highlighter_ruby.rb'
-require './help.rb'
 require 'pathname'
-
+require './help.rb'
+require './updater.rb'
+require 'zip/zipfilesystem'
 include Vkontakte
+
 
 Vkontakte::application_directory = File.expand_path("../..")
 
@@ -22,7 +24,7 @@ class SocialRobot < Qt::MainWindow
 	#Create gui and set timer
 	def initialize()
 		super
-		setWindowTitle("Социальный робот - #{IO.read("../version.txt")}")
+		setWindowTitle("Социальный робот. " + IO.read("../version.txt"))
 		setWindowIcon(Qt::Icon.new("images/logo.png"))
 		#Create main widgets and dock interface 
 		resize(800, 600)
@@ -154,7 +156,7 @@ class SocialRobot < Qt::MainWindow
 		@loot_action.statusTip = "Посмотреть скачанные файлы"
 		connect(@loot_action, SIGNAL('triggered()'), self, SLOT('show_loot()'))
 
-		@kill_session_action = Qt::Action.new("Очистить сессию", self)
+		@kill_session_action = Qt::Action.new(Qt::Icon.new("images/loot1.png"), "Очистить сессию", self)
 		@kill_session_action.statusTip = "Очистить сессию"
 		connect(@kill_session_action, SIGNAL('triggered()'), self, SLOT('kill_session()'))
 
@@ -345,7 +347,7 @@ class SocialRobot < Qt::MainWindow
 	#On kill session clicked
 	def kill_session
 		@me = nil
-		File.delete(Vkontakte::session_file)
+		File.delete(Vkontakte::session_file) if File.exist?(Vkontakte::session_file)
 	end
 
 	
@@ -413,12 +415,18 @@ class SocialRobot < Qt::MainWindow
 		@thread = Thread.new(s,self) do |script,robot|
 			begin
 				log do |text|
-				robot.log_ok text
-			end
-			me
-			eval(script)
-			robot.log_success "Выполнено"
-			@disable_run_gui = true
+					robot.log_ok text
+				end
+				ask_captcha	do |pict|
+					ask({"type" => "ImageData", "data" => pict} => "string")[0]
+				end
+				ask_login do
+					me
+				end
+				
+				eval(script)
+				robot.log_success "Выполнено"
+				@disable_run_gui = true
 			rescue Exception => e  
 				robot.log_error e.message 
 				e.backtrace.each{|l|robot.log_small l} 
@@ -481,11 +489,19 @@ class SocialRobot < Qt::MainWindow
 		controls = []
 		@controls_hash = {}
 		params.each_key do |param| 
-			
-			label = Qt::Label.new
-			param_real = param.dup
-			param_real.force_encoding("UTF-8")
-			label.text = param_real
+			if param.class.name == "Hash"
+				if(param["type"]=="ImageData")
+					pixmap = Qt::Pixmap.new("../../loot/captcha/#{param["data"]}.png")
+					label = Qt::Label.new;
+					label.setPixmap(pixmap);
+				end
+	
+			else
+				label = Qt::Label.new
+				param_real = param.dup
+				param_real.force_encoding("UTF-8")
+				label.text = param_real
+			end
 			case params[param]
 				when "string"
 					input = Qt::LineEdit.new
@@ -582,6 +598,7 @@ class SocialRobot < Qt::MainWindow
 		return if filename.length == 0
 		
 		@controls_hash[sender].text = filename
+		sender.parent.raise if sender.parent
 	end
 	
 	#On files open dialog clicked while asking
@@ -591,6 +608,7 @@ class SocialRobot < Qt::MainWindow
 		filename.force_encoding("UTF-8")
 		
 		@controls_hash[sender].text = filename
+		sender.parent.raise if sender.parent
 	end
 	
 	
@@ -620,18 +638,35 @@ class SocialRobot < Qt::MainWindow
 	
 end
 
+
+Thread.new do 
+	need_update = true
+	while need_update do
+		begin
+			Updater.new.update
+			need_update = false
+		rescue
+			need_update = true
+			sleep 360
+		end
+	end
+end
+
 widget = SocialRobot.new
 
 widget.show
 
-splash = "../splash/pid.txt"
- if File.exist?(splash)
-	begin
-		Process.kill "KILL", IO.read(splash).to_i
-	rescue
-	end
-	File.delete(splash)
- end
+
+
+
+#splash = "../splash/pid.txt"
+# if File.exist?(splash)
+#	begin
+#		Process.kill "KILL", IO.read(splash).to_i
+#	rescue
+#	end
+#	File.delete(splash)
+ #end
 	
 $app.exec
 
