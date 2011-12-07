@@ -123,7 +123,7 @@
 		]
 	},
 	{
-		"signature" => "User.info", "data" => 'User.info', "description" => "Информация о пользователе", 
+		"signature" => "User.info", "data" => '.info', "description" => "Информация о пользователе", 
 		"tips" => 
 		[
 			{"signature" => "Пример. Инфо про меня" , "data" => "me.info.print", "description" => "me.info.print"},
@@ -132,7 +132,7 @@
 		]
 	},
 	{
-		"signature" => "User.music", "data" => 'User.music', "description" => "Музыка пользователя", 
+		"signature" => "User.music", "data" => '.music', "description" => "Музыка пользователя", 
 		"tips" => 
 		[
 			{"signature" => "Пример. Моя музыка" , "data" => "me.music.print", "description" => "me.music.print"},
@@ -141,7 +141,16 @@
 		]
 	},
 	{
-		"signature" => "User.albums", "data" => 'User.albums', "description" => "Альбомы пользователя", 
+		"signature" => "User.mail", "data" => '.mail', "description" => "Отослать сообщение пользователю", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Разослать друзьям спам" , "data" => "me.friends.mail(\"Текст сообщения\",\"Тема сообщения\")", "description" => "me.friends.mail(\"Текст сообщения\",\"Тема сообщения\")"},
+			{"signature" => "Параметр 1" , "description" => "Текст сообщения"},
+			{"signature" => "Параметр 1" , "description" => "Тема сообщения"}
+		]
+	},
+	{
+		"signature" => "User.albums", "data" => '.albums', "description" => "Альбомы пользователя", 
 		"tips" => 
 		[
 			{"signature" => "Пример. Мои альбомы" , "data" => "me.albums.print", "description" => "me.albums.print"},
