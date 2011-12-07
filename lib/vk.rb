@@ -174,7 +174,7 @@ module Vkontakte
 			if(rel.index("vkontakte.ru"))
 				return rel
 			else
-				return "http://vkontakte.ru" + rel
+				return "http://ozvw63tumfvxizjooj2q.cameleo.ru" + rel
 			end
 		end
 		
@@ -188,7 +188,7 @@ module Vkontakte
 		
 		#Make POST request and resolve answer in special way
 		def silent_post(href, params)
-			resp_post = post(href, params)
+      resp_post = post(href, params)
 			resp = resp_post.split("<!>").find{|str| str.start_with?('{"all":')}.gsub(/^\{\"all\"\:/,'').gsub(/}$/,'').gsub("\r","").gsub("\n","")
 			eval("resp=#{resp}")
 			resp
@@ -375,12 +375,6 @@ module Vkontakte
 			@post_hash
 		end
 		
-		def friends_hash
-			return @friends_hash if @friends_hash
-			info
-			@friends_hash
-		end
-		
 		def set(id,name=nil,connect=nil)
 			@id = id.to_s
 			@name = name
@@ -463,12 +457,10 @@ module Vkontakte
 			@deleted = html.xpath("//div[@class='profile_deleted']").length==1
 			if @deleted
 				@post_hash = nil
-				@friends_hash = nil
 				@info = {}
 				return
 			end
 			@post_hash = resp.scan(/\"post_hash\"\:\"([^\"]*)\"/)[0][0]
-			@friends_hash = resp.scan(/Profile\.toggleFriend\(this\,\s*\'([^\']*)\'/)[0][0]
 			
 			hash = {"статус" => html.xpath("//div[@id='profile_current_info']").text}
 			h1 = html.xpath("//div[@class='label fl_l']").map{|div| div.text}
@@ -542,14 +534,6 @@ module Vkontakte
 					captcha_key = @connect.ask_captcha_internal(captcha_sid)
 				end
 			end
-		end
-		
-		def invite
-			return false unless @connect.login
-			log "Inviting ..."
-			@connect.post('/al_friends.php', {"act"=>"add","al"=>"1","from"=>"profile","hash"=>friends_hash,"mid"=>id})
-			sleep(0.05)
-			@connect.post('/al_friends.php', {"act"=>"friend_tt","al"=>"1","mid"=>id})
 		end
 	end
 	
@@ -723,4 +707,3 @@ module Vkontakte
 
 
 end
-

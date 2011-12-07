@@ -246,11 +246,26 @@ class SocialRobot < Qt::MainWindow
 	def generate_menu(menu,directory)
 		Pathname.new(directory).children.each do |e|  
 			if e.directory?
-				generate_menu(menu.addMenu(e.basename().to_s),e.to_s)
-				
+				name_full = e.to_s
+				name = e.basename.to_s
+				name_local = File.join(name_full,".name")
+				if(File.exist?(name_local))
+					name = IO.read(name_local) 
+					name.force_encoding("UTF-8")
+				end
+				generate_menu(menu.addMenu(name),e.to_s)
 			else
-				new_action = Qt::Action.new(Qt::Icon.new("images/script.png"),e.basename(".rb").to_s, self)
-				new_action.statusTip = e.basename(".rb").to_s
+				next unless e.basename("").to_s.end_with?(".rb")
+				name_full = e.to_s.gsub(/\.rb$/,".name")
+				name = e.basename(".rb").to_s
+				if(File.exist?(name_full))
+					name = IO.read(name_full) 
+					name.force_encoding("UTF-8")
+				end
+				
+				
+				new_action = Qt::Action.new(Qt::Icon.new("images/script.png"),name, self)
+				new_action.statusTip = name
 				new_action.setData(Qt::Variant.new(e.to_s))
 				connect(new_action, SIGNAL('triggered()'), self, SLOT('menu_script_click()'))
 				menu.addAction(new_action)
