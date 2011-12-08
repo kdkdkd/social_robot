@@ -111,7 +111,7 @@ module Vkontakte
 		end
 		
 		def ask_captcha_internal(captcha_sid)
-			file_name = save("http://vkontakte.ru/captcha.php?sid=#{captcha_sid}&s=1","captcha","#{captcha_sid}.jpg")
+			file_name = save(addr("/captcha.php?sid=#{captcha_sid}&s=1","captcha","#{captcha_sid}.jpg"))
 			file_name_png = file_name.gsub(".jpg",".png")
 			command = "\"#{Vkontakte::convert_exe}\" \"#{file_name}\" \"#{file_name_png}\""
 			system(command)
@@ -174,7 +174,7 @@ module Vkontakte
 			if(rel.index("vkontakte.ru"))
 				return rel
 			else
-				return "http://ozvw63tumfvxizjooj2q.cameleo.ru" + rel
+				return "http://vkontakte.ru" + rel
 			end
 		end
 		
