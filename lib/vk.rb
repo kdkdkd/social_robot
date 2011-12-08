@@ -12,6 +12,20 @@ module Vkontakte
 	
 	
 	
+	#which page is to refer all reqests
+	@@vkontakte_location_var = "http://vkontakte.ru"
+	
+	#change page which refers all requests
+	def force_location(location = "http://vkontakte.ru")
+		@@vkontakte_location_var = location
+	end
+	
+	#get page which refers all requests
+	def vkontakte_location
+		@@vkontakte_location_var
+	end
+	
+	
 	#Ask user to resolve captcha
 	def ask_captcha(*args, &block)
 		@@ask_captcha_block = block if block
@@ -174,7 +188,7 @@ module Vkontakte
 			if(rel.index("vkontakte.ru"))
 				return rel
 			else
-				return "http://vkontakte.ru" + rel
+				return vkontakte_location() + rel
 			end
 		end
 		

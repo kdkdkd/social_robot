@@ -438,7 +438,7 @@ class SocialRobot < Qt::MainWindow
 				ask_login do
 					me
 				end
-				
+				force_location
 				eval(script)
 				robot.log_success "Выполнено"
 				@disable_run_gui = true
@@ -645,11 +645,31 @@ class SocialRobot < Qt::MainWindow
 		end
 	end
 	
+	
+	
 	#Access to User self object
 	def me
 		return @me if @me
 		@me = login
 	end
+	
+	
+	#Asks to use anonymizer
+	def use_anonymizer
+		if @anonymizer 
+			force_location @anonymizer
+			return
+		end
+		agent = Mechanize.new
+		agent.user_agent_alias = 'Mac Safari'
+		page = agent.get "http://cameleo.ru/"
+		search_form = page.form :id => "proxy"
+		search_form.field_with(:name => "url").value = "vkontakte.ru"
+		search_results = agent.submit search_form
+		@anonymizer = "http://" + search_results.uri.host
+		force_location @anonymizer
+	end
+	
 	
 end
 
