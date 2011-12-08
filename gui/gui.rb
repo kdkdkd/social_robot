@@ -433,7 +433,7 @@ class SocialRobot < Qt::MainWindow
 					robot.log_ok text
 				end
 				ask_captcha	do |pict|
-					ask({"type" => "ImageData", "data" => pict} => "string")[0]
+					ask({"type" => "Image", "Path" => pict} => "string")[0]
 				end
 				ask_login do
 					me
@@ -505,8 +505,8 @@ class SocialRobot < Qt::MainWindow
 		@controls_hash = {}
 		params.each_key do |param| 
 			if param.class.name == "Hash"
-				if(param["type"]=="ImageData")
-					pixmap = Qt::Pixmap.new("../../loot/captcha/#{param["data"]}.png")
+				if(param["type"]=="Image")
+					pixmap = Qt::Pixmap.new("../../loot/captcha/#{param["Path"]}.png")
 					label = Qt::Label.new;
 					label.setPixmap(pixmap);
 				end
