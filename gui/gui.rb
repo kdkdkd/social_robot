@@ -161,9 +161,9 @@ class SocialRobot < Qt::MainWindow
 		@kill_session_action.statusTip = "Очистить сессию"
 		connect(@kill_session_action, SIGNAL('triggered()'), self, SLOT('kill_session()'))
 
-		@kill_session_action = Qt::Action.new("Настройки", self)
-		@kill_session_action.statusTip = "Настройки"
-		connect(@kill_session_action, SIGNAL('triggered()'), self, SLOT('open_settings()'))
+		@open_settings_action = Qt::Action.new("Настройки", self)
+		@open_settings_action.statusTip = "Настройки"
+		connect(@open_settings_action, SIGNAL('triggered()'), self, SLOT('open_settings()'))
 
 		
 		@exit_action = Qt::Action.new("Выход", self)
@@ -180,6 +180,7 @@ class SocialRobot < Qt::MainWindow
 		@fileMenu.addAction(@stop_action)
     	@fileMenu.addAction(@loot_action)
 	    @fileMenu.addAction(@kill_session_action)
+		@fileMenu.addAction(@open_settings_action)
 		@fileMenu.addAction(@exit_action)
 		
 		generate_menu(menuBar(),'../prog')
