@@ -6,6 +6,7 @@ require '../lib/sugar_vk.rb'
 require './highlighter_ruby.rb'
 require 'pathname'
 require './help.rb'
+require './settings.rb'
 require './updater.rb'
 require 'zip/zipfilesystem'
 include Vkontakte
@@ -19,7 +20,7 @@ $app = Qt::Application.new(ARGV)
 
 
 class SocialRobot < Qt::MainWindow
-	slots    'open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
+	slots    'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
 
 	#Create gui and set timer
 	def initialize()
@@ -156,11 +157,14 @@ class SocialRobot < Qt::MainWindow
 		@loot_action.statusTip = "Посмотреть скачанные файлы"
 		connect(@loot_action, SIGNAL('triggered()'), self, SLOT('show_loot()'))
 
-		@kill_session_action = Qt::Action.new(Qt::Icon.new("images/loot1.png"), "Очистить сессию", self)
+		@kill_session_action = Qt::Action.new("Очистить сессию", self)
 		@kill_session_action.statusTip = "Очистить сессию"
 		connect(@kill_session_action, SIGNAL('triggered()'), self, SLOT('kill_session()'))
 
-		
+		@kill_session_action = Qt::Action.new("Настройки", self)
+		@kill_session_action.statusTip = "Настройки"
+		connect(@kill_session_action, SIGNAL('triggered()'), self, SLOT('open_settings()'))
+
 		
 		@exit_action = Qt::Action.new("Выход", self)
 	    @exit_action.shortcut = Qt::KeySequence.new("Ctrl+Q")
@@ -272,6 +276,11 @@ class SocialRobot < Qt::MainWindow
 				
 			end
 		end
+	end
+	
+	#Open settings window
+	def open_settings
+		SettingsWindow.show
 	end
 	
 	#Clicked on some auto generated menu
@@ -438,7 +447,11 @@ class SocialRobot < Qt::MainWindow
 				ask_login do
 					me
 				end
-				force_location
+				if(Settings["use_anonymizer"] == "true")
+					use_anonymizer
+				else
+					force_location
+				end
 				eval(script)
 				robot.log_success "Выполнено"
 				@disable_run_gui = true
@@ -690,6 +703,7 @@ end
 widget = SocialRobot.new
 
 widget.show
+widget.raise
 
 
 
