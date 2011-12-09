@@ -36,7 +36,7 @@ class Updater
 		#Update batch
 		File.open("../../SocialRobotConsole.bat","w") do |bat|
 			bat<<"cd #{last_version}/gui\n"
-			bat<<"%~dp0ruby/bin/ruby.exe %~dp0#{last_version}/gui/gui.rb\n"
+			bat<<"\"%~dp0ruby/bin/ruby.exe\" \"%~dp0#{last_version}/gui/gui.rb\"\n"
 			bat<<"sleep 5"
 		end
 		
