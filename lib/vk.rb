@@ -94,6 +94,11 @@ module Vkontakte
 	class Connect
 		attr_reader :uid
 		
+		
+		def cookie
+			@cookie_login
+		end
+		
 		def initialize(login = nil, password = nil)
 			@agent = Mechanize.new { |agent|  agent.user_agent_alias = 'Mac Safari'	}
 			@login = login
@@ -204,7 +209,7 @@ module Vkontakte
 		
 		#Make POST request and resolve answer in special way
 		def silent_post(href, params)
-      resp_post = post(href, params)
+			resp_post = post(href, params)
 			resp = resp_post.split("<!>").find{|str| str.start_with?('{"all":')}.gsub(/^\{\"all\"\:/,'').gsub(/}$/,'').gsub("\r","").gsub("\n","")
 			eval("resp=#{resp}")
 			resp
@@ -391,6 +396,12 @@ module Vkontakte
 			@post_hash
 		end
 		
+		
+		def friend_hash
+			info
+			@friend_hash
+		end
+		
 		def set(id,name=nil,connect=nil)
 			@id = id.to_s
 			@name = name
@@ -478,6 +489,12 @@ module Vkontakte
 			end
 			@post_hash = resp.scan(/\"post_hash\"\:\"([^\"]*)\"/)[0][0]
 			
+			begin 
+				@friend_hash = resp.scan(/toggleFriend\(this\,\s*\'([^\']*)\'/)[0][0]
+			rescue
+				@friend_hash = nil
+			end
+			
 			hash = {"статус" => html.xpath("//div[@id='profile_current_info']").text}
 			h1 = html.xpath("//div[@class='label fl_l']").map{|div| div.text}
 			h2 = html.xpath("//div[@class='labeled fl_l']").map{|div| div.text}
@@ -505,26 +522,29 @@ module Vkontakte
 		
 		
 		def post(msg,connector=nil)
-			connect = forсe_login(connector,@connect)
+			connect_old = @connect
+			@connect = forсe_login(connector,@connect)
 			log "Posting ..."
 			captcha_sid = nil
 			captcha_key = nil
+			@post_hash = nil
             while true
 				hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id, "type" => "all" }
 				unless(captcha_key.nil?)
 					hash["captcha_sid"] = captcha_sid
 					hash["captcha_key"] = captcha_key
 				end
-				res = connect.post('/al_wall.php', hash)
+				res = @connect.post('/al_wall.php', hash)
 				if(res.index("<!json>"))
 					html_text = res.split("<!>").find{|x| x.index('"post_table"')}
-					return Post.parse_html(Nokogiri::HTML(html_text.gsub("<!-- ->->","")),self,connect)
+					return Post.parse_html(Nokogiri::HTML(html_text.gsub("<!-- ->->","")),self,@connect)
 				else
 					a = res.split("<!>")
 					captcha_sid = a[a.length-2]
-					captcha_key = connect.ask_captcha_internal(captcha_sid)
+					captcha_key = @connect.ask_captcha_internal(captcha_sid)
 				end
 			end
+			@connect = connect_old
 		end
 		
 		def mail(message, title = "",connector=nil)
@@ -580,6 +600,51 @@ module Vkontakte
 			
 			res
 
+		end
+		
+		
+		def invite(message=nil,connector=nil)
+			connect_old = @connect
+			@connect = forсe_login(connector,@connect)
+			log "Inviting ..."
+
+			fh = friend_hash
+			
+			
+			
+			captcha_sid = nil
+			captcha_key = nil
+            while true
+				hash = {"act" => "add", "al" => "1", "from" => "profile", "hash" => fh, "mid" => id }
+				unless(captcha_key.nil?)
+					hash["captcha_sid"] = captcha_sid
+					hash["captcha_key"] = captcha_key
+				end
+				res = @connect.post('/al_friends.php', hash)
+				if(res.index("<div"))
+					break
+				else
+					a = res.split("<!>")
+					captcha_sid = a[a.length-2]
+					captcha_key = @connect.ask_captcha_internal(captcha_sid)
+				end
+			end
+
+			@connect.post('/al_friends.php', {"act" => "friend_tt", "al" => "1", "mid" => id})
+
+			@connect.post('/al_friends.php', {"act" => "request_text", "al" => "1", "mid" => id,"hash" => fh, "message" => message}) if message
+			
+			
+			@connect = connect_old
+		end
+		
+		
+		def uninvite(connector=nil)
+			connect_old = @connect
+			@connect = forсe_login(connector,@connect)
+			log "Uninviting ..."
+			@connect.post('/al_friends.php', {"act" => "remove", "al" => "1", "mid" => id, "hash" => friend_hash})
+			@connect = connect_old
 		end
 		
 	end
