@@ -158,7 +158,39 @@
 			{"signature" => "Пример. Друзья Юли" , "data" => "me.friends.one(\"Юлия\").friends.print", "description" => "me.friends.one(\"Юлия\").friends.print"},
 			{"signature" => "Функция Возвращает", "description" => "Array"}
 		]
-	}],
+	},
+	{
+		"signature" => "User.post", "data" => '.post', "description" => "Написать на стене", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Написать на своей стене" , "data" => "me.post(\"привет\")", "description" => "me.post(\"привет\")"},
+			{"signature" => "Пример. Написать на стене всех друзей" , "data" => "me.friends.post(\"Приходите на пати\")", "description" => "me.friends.post(\"Приходите на пати\")"},
+			{"signature" => "Пример. Написать сообщение и сразу поставить лайк" , "data" => "me.post(\"привет\").like", "description" => "me.post(\"привет\").like"},
+			{"signature" => "Функция Возвращает", "description" => "Post"}
+		]
+	},
+	{
+		"signature" => "User.mail", "data" => '.mail', "description" => "Написать сообщение", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Написать сообщение всем своим друзьям" , "data" => "me.friends.mail(\"Сообщение\",\"Заголовок\")", "description" => "me.friends.mail(\"Сообщение\",\"Заголовок\")"}
+		]
+	},
+	{
+		"signature" => "User.wall", "data" => '.wall', "description" => "Сообщение со стены", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Поставить лайк всем сообщениям на первой странице" , "data" => "me.wall.like", "description" => "me.wall.like"},
+			{"signature" => "Пример. Поставить лайк всем сообщениям на второй странице" , "data" => "me.wall(20).like", "description" => "me.wall(20).like"},
+			{"signature" => "Пример. Поставить лайк всем сообщениям на третьей странице" , "data" => "me.wall(40).like", "description" => "me.wall(40).like"},
+			{"signature" => "Пример. Поставить лайк всем сообщениям" , "data" => "me.wall(\"all\").like", "description" => "me.wall(\"all\").like"},
+			{"signature" => "Пример. Удалить все сообщения со стены" , "data" => "me.wall(\"all\").remove", "description" => "me.wall(\"all\").remove"},
+			{"signature" => "Функция Возвращает", "description" => "Array"}
+		]
+	}
+	
+	
+	],
 	"Музыка" => [
 	{
 		"signature" => "Music.name", "data" => '.name', "description" => "Название песни", 

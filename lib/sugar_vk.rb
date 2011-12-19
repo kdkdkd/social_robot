@@ -8,6 +8,9 @@ class Array
 	def friends
 		self.inject([]){|a,x| x.friends.each{|f| a.push(f)} if x.respond_to?('friends');a}.uniq
 	end
+	def wall(offset = 0)
+		self.inject([]){|a,x| x.wall(offset).each{|f| a.push(f)} if x.respond_to?('wall');a}.uniq
+	end
 	def music
 		self.inject([]){|a,x| x.music.each{|m| a.push(m)} if x.respond_to?('music');a}.uniq
 	end
@@ -17,6 +20,19 @@ class Array
 	def photos
 		self.inject([]){|a,x| x.photos.each{|m| a.push(m)} if x.respond_to?('photos');a}.uniq
 	end
+	def like
+		self.each{|x| x.like if x.respond_to?('like')}
+	end
+	def unlike
+		self.each{|x| x.unlike if x.respond_to?('unlike')}
+	end
+	def post(msg,connector=nil)
+		self.inject([]){|a,x| a.push(x.post(msg,connector)) if x.respond_to?('post');a}.uniq
+	end
+	def mail(message, title = "",connector=nil)
+		self.inject([]){|a,x| a.push(x.mail(message,title,connector)) if x.respond_to?('mail');a}.uniq
+	end
+
 	def all(search)
 		search.force_encoding("UTF-8")
 		self.select(){|x| x.to_s.index(search)}

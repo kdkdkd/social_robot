@@ -42,10 +42,12 @@ module Vkontakte
 	end
 	
 	#Try to login in any way
-	def forсe_login(connector)
+	def forсe_login(connector,self_connect=nil)
 		connect = nil
 		if connector
 			connect = connector.connect
+		elsif !self_connect.nil?
+			connect = self_connect
 		else
 			connect = Vkontakte::last_connect
 		end
@@ -125,7 +127,7 @@ module Vkontakte
 		end
 		
 		def ask_captcha_internal(captcha_sid)
-			file_name = save(addr("/captcha.php?sid=#{captcha_sid}&s=1","captcha","#{captcha_sid}.jpg"))
+			file_name = save(addr("/captcha.php?sid=#{captcha_sid}&s=1"),"captcha","#{captcha_sid}.jpg")
 			file_name_png = file_name.gsub(".jpg",".png")
 			command = "\"#{Vkontakte::convert_exe}\" \"#{file_name}\" \"#{file_name_png}\""
 			system(command)
@@ -502,8 +504,8 @@ module Vkontakte
 		end
 		
 		
-		def post(msg)
-			return false unless @connect.login
+		def post(msg,connector=nil)
+			connect = forсe_login(connector,@connect)
 			log "Posting ..."
 			captcha_sid = nil
 			captcha_key = nil
@@ -513,21 +515,22 @@ module Vkontakte
 					hash["captcha_sid"] = captcha_sid
 					hash["captcha_key"] = captcha_key
 				end
-				res = @connect.post('/al_wall.php', hash)
+				res = connect.post('/al_wall.php', hash)
 				if(res.index("<!json>"))
-					break
+					html_text = res.split("<!>").find{|x| x.index('"post_table"')}
+					return Post.parse_html(Nokogiri::HTML(html_text.gsub("<!-- ->->","")),self,connect)
 				else
 					a = res.split("<!>")
 					captcha_sid = a[a.length-2]
-					captcha_key = @connect.ask_captcha_internal(captcha_sid)
+					captcha_key = connect.ask_captcha_internal(captcha_sid)
 				end
 			end
 		end
 		
-		def mail(message, title = "")
-			return false unless @connect.login
+		def mail(message, title = "",connector=nil)
+			connect = forсe_login(connector,@connect)
 			log "Mailing ..."
-			chas = @connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0][0]
+			chas = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0][0]
 			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
 			chas.reverse!
 
@@ -539,18 +542,121 @@ module Vkontakte
 					hash["captcha_sid"] = captcha_sid
 					hash["captcha_key"] = captcha_key
 				end
-				res = @connect.post('/al_mail.php', hash)
+				res = connect.post('/al_mail.php', hash)
 				if(res.index("<div"))
 					break
 				else
 					a = res.split("<!>")
 					captcha_sid = a[a.length-2]
-					captcha_key = @connect.ask_captcha_internal(captcha_sid)
+					captcha_key = connect.ask_captcha_internal(captcha_sid)
 				end
 			end
 		end
+		
+		def wall(offset = 0)
+			if offset=="all"
+				res_all = []
+				index = 0
+				while true do
+					res = wall(index.to_s)
+					index += res.length
+					break if res.length == 0
+					res_all += res
+				end
+				return res_all
+			end
+		
+			res_post = @connect.post("/wall#{id}",{"offset" => offset.to_s, "al" => "1","part"=>"1"})
+			html_text = res_post.split("<!>").find{|x| x.index('"post_table"')}
+			return [] unless html_text
+			html = Nokogiri::HTML(html_text.gsub("<!-- ->->",""))
+			
+			
+			
+			res = []
+			html.xpath("//table[@class='post_table']").each do |table|
+				res.push Post.parse_html(table,self,@connect)
+			end
+			
+			res
+
+		end
+		
 	end
 	
+	
+	class Post
+		attr_accessor :id, :user, :text, :delete_hash, :like_hash, :connect
+		
+		def set(user,id,text,delete_hash,like_hash,connect)
+			@id = id
+			@text = text
+			@connect = connect
+			@user = user
+			@delete_hash = delete_hash
+			@like_hash = like_hash
+			self
+		end
+		
+		def Post.parse_html(table,user,connect)
+			
+			id_of_post = table.to_s.scan(Regexp.new("#{user.id}\\_(\\d+)"))[0][0]
+
+			delete_hash = table.to_s.scan(/wall\.deletePost[^\,]*\,\s*\'([^\']*)\'/)[0]
+			delete_hash = (delete_hash)?delete_hash[0]:nil
+
+			like_hash = table.to_s.scan(/wall\.like[^\,]*\,\s*\'([^\']*)\'/)[0]
+			like_hash = (like_hash)?like_hash[0]:nil
+
+			text_of_post = table.xpath(".//div[@id='wpt#{user.id}_#{id_of_post}']")
+			text_of_post = (text_of_post.length>0)?(text_of_post[0].text):nil
+
+			Post.new.set(user,id_of_post,text_of_post,delete_hash,like_hash,connect)
+		
+		end
+		
+		
+		
+		def uniq_id
+			self.id + "_" + self.user.id
+		end
+		
+		def ==(other_user)
+			self.uniq_id == other_user.uniq_id
+		end
+		
+		def hash
+			self.id.hash
+		end
+		
+		
+		def like(connector=nil)
+			connect = forсe_login(connector,@connect)
+			return false unless connect.login
+			return false unless like_hash
+			log "Like post ..."
+			res_post = connect.post("/like.php",{"act" => "a_do_like", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user.id}_#{id}","wall"=>"1"})
+		end
+		
+		def unlike(connector=nil)
+			connect = forсe_login(connector,@connect)
+			return false unless connect.login
+			return false unless like_hash
+			log "Unlike post ..."
+			res_post = connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user.id}_#{id}","wall"=>"1"})
+		end
+		
+		def remove
+			return false unless @connect.login
+			return false unless delete_hash
+			log "Delete post ..."
+			res_post = @connect.post("/al_wall.php",{"act" => "delete", "al" => "1","from"=>"wall","hash"=>delete_hash,"post"=>"#{user.id}_#{id}","root"=>"0"})
+		end
+
+		def to_s
+			"#{text}(#{@id},#{delete_hash},#{like_hash})"
+		end
+	end
 	
 
 	class Album
