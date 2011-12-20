@@ -180,15 +180,53 @@
 		"signature" => "User.wall", "data" => '.wall', "description" => "Сообщение со стены", 
 		"tips" => 
 		[
-			{"signature" => "Пример. Поставить лайк всем сообщениям на первой странице" , "data" => "me.wall.like", "description" => "me.wall.like"},
-			{"signature" => "Пример. Поставить лайк всем сообщениям на второй странице" , "data" => "me.wall(20).like", "description" => "me.wall(20).like"},
-			{"signature" => "Пример. Поставить лайк всем сообщениям на третьей странице" , "data" => "me.wall(40).like", "description" => "me.wall(40).like"},
+			{"signature" => "Пример. Поставить лайк первым 50 сообщениям" , "data" => "me.wall.like", "description" => "me.wall.like"},
+			{"signature" => "Пример. Поставить лайк первым 20 сообщениям" , "data" => "me.wall(20).like", "description" => "me.wall(20).like"},
+			{"signature" => "Пример. Поставить лайк первым 40 сообщениям" , "data" => "me.wall(40).like", "description" => "me.wall(40).like"},
 			{"signature" => "Пример. Поставить лайк всем сообщениям" , "data" => "me.wall(\"all\").like", "description" => "me.wall(\"all\").like"},
 			{"signature" => "Пример. Удалить все сообщения со стены" , "data" => "me.wall(\"all\").remove", "description" => "me.wall(\"all\").remove"},
 			{"signature" => "Функция Возвращает", "description" => "Array"}
 		]
+	},
+	{
+		"signature" => "User.invite", "data" => '.invite', "description" => "Пригласить друга", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Пригласить человека с id 2345" , "data" => "User.id(2345).invite", "description" => "User.id(2345).invite"},
+			{"signature" => "Пример. Пригласить человека по имени Артем" , "data" => "User.one(\"Артем\").invite", "description" => "User.one(\"Артем\").invite"},
+			{"signature" => "Пример. Пригласить несколько друзей" , "data" => "User.all(\"Лена\").invite", "description" => "User.all(\"Лена\").invite"},
+			{"signature" => "Пример. Разослать спам в приглашении" , "data" => "User.all(\"Программирование\").invite(\"github.com - Отличный сайт\")", "description" => "User.all(\"Программирование\").invite(\"github.com - Отличный сайт\")"},
+		]
+	},
+	{
+		"signature" => "User.uninvite", "data" => '.uninvite', "description" => "Удалить друга", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Удалить своего первого друга" , "data" => "me.friends[0].uninvite", "description" => "me.friends[0].uninvite"},
+			{"signature" => "Пример. Удалить кого-то конкретного" , "data" => "me.friends.one(\"Артем Шевченко\").uninvite", "description" => "me.friends.one(\"Артем Шевченко\").uninvite"},
+			{"signature" => "Пример. Удалить всех друзей" , "data" => "me.friends.uninvite", "description" => "me.friends.uninvite"},
+		]
+	},
+	{
+		"signature" => "User.all", "data" => 'User.all', "description" => "Поиск людей", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Найти людей по интересам" , "data" => "User.all(\"Живопись\").print", "description" => "User.all(\"Живопись\").print"},
+			{"signature" => "Пример. Найти 1000 людей с заданным именем" , "data" => "User.all(\"Аня\",1000).print", "description" => "User.all(\"Аня\",1000).print"},
+			{"signature" => "Пример. Найти людей в конкретном городе и пригласить дружить" , "data" => "User.all(\"Кино\",100, {\"Страна\"=>\"Украина\", \"Город\"=>\"Киев\"}).invite", "description" => "User.all(\"Кино\",100, {\"Страна\"=>\"Украина\", \"Город\"=>\"Киев\"}).invite"},
+			{"signature" => "Пример. Детальный поиск и приглашение в друзья" , "data" => "User.all(\"Кино\",100, {\"Страна\"=>\"Украина\", \"Город\"=>\"Киев\", \"Пол\"=>\"Мужской\", \"Онлайн\"=>\"Да\" }).invite", "description" => "User.all(\"Кино\",100, {\"Страна\"=>\"Украина\", \"Город\"=>\"Киев\", \"Пол\"=>\"Мужской\", \"Онлайн\"=>\"Да\" }).invite"},
+			{"signature" => "Функция Возвращает", "description" => "Array"}
+		]
+	},
+	{
+		"signature" => "User.one", "data" => 'User.one', "description" => "Найти одного человека", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Найти человек по имени и фамилии" , "data" => "User.one(\"Артем Шевченко\").print", "description" => "User.one(\"Артем Шевченко\").print"},
+			{"signature" => "Пример. Найти человек по имени и фамилии в конкретном городе" , "data" => "User.one(\"Артем Шевченко\", {\"Страна\"=>\"Россия\", \"Город\"=>\"Москва\"}).print", "description" => "User.one(\"Артем Шевченко\", {\"Страна\"=>\"Россия\", \"Город\"=>\"Москва\"}).print"},
+			{"signature" => "Функция Возвращает", "description" => "User"}
+		]
 	}
-	
 	
 	],
 	"Музыка" => [

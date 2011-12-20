@@ -2,6 +2,12 @@ class Array
 	def download
 		self.each{|x| x.download if x.respond_to?('download')}
 	end
+	def invite(message=nil,connector=nil)
+		self.each{|x| x.invite(message,connector) if x.respond_to?('invite')}
+	end
+	def uninvite(connector=nil)
+		self.each{|x| x.uninvite(connector) if x.respond_to?('uninvite')}
+	end
 	def remove
 		self.each{|x| x.remove if x.respond_to?('remove')}
 	end
