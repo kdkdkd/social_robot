@@ -379,6 +379,119 @@ module Vkontakte
 		
 		
 	end
+	
+	class Group
+		attr_accessor :connect, :id, :type
+		
+		def set(id,name=nil,type=:club,connect=nil)
+			@id = id.to_s
+			@name = name
+			@type=type
+			@connect = (connect)?connect:Vkontakte::last_connect
+			self
+		end
+		
+		def name
+			return @name if @name 
+			info
+			@name
+		end
+	
+	    def to_s
+			(@name)? "#{@name}(#{type.to_s}#{@id})" : "#{type.to_s}#{@id}"
+		end
+		
+		def uniq_id
+			type.to_s + id
+		end
+		
+		def ==(other)
+			self.uniq_id == other.uniq_id
+		end
+		
+		def hash
+			self.id.hash
+		end
+		 
+		def eql?(other)
+			self == other
+		end
+		
+		def info(connector=nil)
+			connect = forсe_login(connector,@connect)
+			log "Fetching info..."
+			href = "/#{type}#{id}" 
+			resp = connect.get(href)
+			begin
+				@group_hash = resp.scan(Regexp.new("#{id}\,\s*\'([^\']*)\'"))[0][0]
+			rescue
+				@group_hash = nil
+			end
+			
+			@name = Nokogiri::HTML(resp).xpath("//title").text unless @name
+		end
+		
+		def group_hash
+			return @group_hash if @group_hash
+			info
+			@group_hash
+		end
+		
+		def Group.parse(href,connector=nil)
+			connect = forсe_login(connector)
+			if(href.index("/club"))
+				Group.new.set(href.split("/club").last,nil,:club,connect)
+			elsif (href.index("/event"))
+				Group.new.set(href.split("/event").last,nil,:event,connect)
+			end
+		end
+		
+		def enter(connector=nil)
+			old_connect = @connect
+			@connect = forсe_login(connector,@connect)
+			return unless group_hash
+			log "Entering group ..."
+			connect.post('/al_groups.php',{"act" => "enter", "al" => "1", "gid" => id , "hash" => group_hash})
+			@connect = old_connect
+			
+		end
+		
+		def leave(connector=nil)
+			old_connect = @connect
+			@connect = forсe_login(connector,@connect)
+			return unless group_hash
+			log "Leaving group ..."
+			if(type == :club)
+				connect.post('/al_groups.php',{"act" => "leave", "al" => "1", "gid" => id , "hash" => group_hash})
+			elsif(type == :event)
+				connect.post('/al_groups.php',{"act" => "enter", "context" => "_decline" ,"al" => "1", "gid" => id , "hash" => group_hash})
+			end
+			@connect = old_connect
+		end
+		
+		
+		def invite(user,connector=nil)
+			old_connect = @connect
+			@connect = forсe_login(connector,@connect)
+			log "Inviting to group ..."
+			
+			invite_box = @connect.post('/al_page.php', {'act' => 'a_invite_box', 'al' => '1', 'gid' => id})
+			
+			invite_box.scan(/page\.inviteToGroup\(([^\)]*)\)/).each do |arg|
+				log arg
+				args = arg[0].split(",").map{|x|x.strip}
+				correct_args = args.find{|x| x = user.id}
+				if(correct_args)
+					hash = args.last.gsub("'",'')
+					@connect.post('/al_page.php', {'act' => 'a_invite', 'al' => '1', 'gid' => id, "hash" => hash, "mid" => user.id}).scan("page.inviteToGroup\(([^\)]*)\)")
+				end
+			end
+			
+			@connect = old_connect
+		end
+	
+	end
+	
 
 	class User
 		attr_accessor :me, :connect
@@ -388,6 +501,9 @@ module Vkontakte
 		end
 		
 		
+		def User.get_post_hash(resp)
+			resp.scan(/\"post_hash\"\:\"([^\"]*)\"/)[0][0]
+		end
 		
 		def id
 			@id = @id.to_s
@@ -507,7 +623,7 @@ module Vkontakte
 				@info = {}
 				return
 			end
-			@post_hash = resp.scan(/\"post_hash\"\:\"([^\"]*)\"/)[0][0]
+			@post_hash = User.get_post_hash(resp)
 			
 			begin 
 				@friend_hash = resp.scan(/toggleFriend\(this\,\s*\'([^\']*)\'/)[0][0]
@@ -535,7 +651,15 @@ module Vkontakte
 			return false unless @connect.login
 			log "List of albums ..."
 			Nokogiri::HTML(@connect.get("/albums#{@id}")).xpath("//div[@class='name']/a").inject([]) do |array,a| 
-				array.push(Album.new.set(self,a["href"].scan(/_(\d+)/)[0][0],a.text,connect))
+				album_delete_hash = nil
+				
+				a.xpath("../..//a").each do |a_delete| 
+					a_delete_onclick = a_delete["onclick"]
+					if(a_delete_onclick && a_delete_onclick.index("photos.deleteAlbum"))
+						album_delete_hash = a_delete_onclick.scan(/\'([^\']+)\'/)[1][0]
+					end
+				end
+				array.push(Album.new.set(self,a["href"].scan(/_(\d+)/)[0][0],a.text,album_delete_hash,connect))
 				array
 			end
 		end
@@ -739,6 +863,39 @@ module Vkontakte
 			
 			
 		end
+		
+		
+		def User.parse(href)
+			if href.index("/id")
+				id = href.split("/id")[1] 
+			else
+				id = href.split("/").last
+			end
+			User.id(id)
+		end
+		
+		
+		def groups
+			return false unless @connect.login
+			log "List of groups..."
+			res = []
+			Nokogiri::HTML(@connect.get('/groups?id='+id)).xpath('//a').each do |a| 
+				text_strip = a.text.strip
+				unless(text_strip.empty?)
+					href = a["href"]
+					type = nil
+					if href && href =~ /\/club\d+/
+						type = :club
+					elsif href && href =~ /\/event\d+/
+						type = :event
+					end
+					res.push Group.new.set(href.gsub("/event","").gsub("/club",""),a.text.strip,type,@connect) if type
+				end
+			end
+			res.uniq!
+			res
+		
+		end
 	end
 	
 	
@@ -817,12 +974,15 @@ module Vkontakte
 	
 
 	class Album
-		attr_accessor :id, :user, :name, :connect
-		def set(user,id,name,connect)
+		attr_accessor :id, :user, :name, :connect, :delete_hash
+		
+		
+		def set(user,id,name,delete_hash,connect)
 			@id = id
 			@name = name
 			@connect = connect
 			@user = user
+			@delete_hash = delete_hash
 			self
 		end
 		
@@ -846,14 +1006,14 @@ module Vkontakte
 			self == other
 		end
 		
-		def Album.create(name, description, connector=nil)
+		def Album.create(name, description="", connector=nil)
 			connect = forсe_login(connector)
 			
 			log "Creating album ..."
 			hash = connect.post('/al_photos.php',{"al" => "1", "act" => "new_album_box"}).scan(/hash\:\s*\'([^\']+)\'/)[0][0]
 			res = connect.post('/al_photos.php',{"al" => "1", "act" => "new_album", "comm" => "0", "view" => "0", "only" => "false" , "oid" => connect.uid, "title" => name, "desc" => description, "hash" => hash })
 			album_id = res.scan(/\_(\d+)/)[0][0]
-			Album.new.set(User.new.set(connect.uid), album_id ,name,connect)
+			Album.new.set(User.new.set(connect.uid), album_id ,name,nil,connect)
 		end
 		
 		
@@ -933,6 +1093,14 @@ module Vkontakte
 				break if b
 			end
 			res
+		end
+		
+		
+		def remove
+			return false unless @connect.login
+			return unless delete_hash
+			log "Removing album..."
+			@connect.post('/al_photos.php',{"act" => "delete_album", "al" => "1", "album" => "#{user.id}_#{id}", "hash" => delete_hash})
 		end
 		
 	end

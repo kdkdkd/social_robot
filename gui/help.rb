@@ -105,6 +105,16 @@
 			{"signature" => "Функция Возвращает", "description" => "User"}
 		]
 	},
+	
+	{
+		"signature" => "User.parse", "data" => 'User.parse', "description" => "Найти пользователя по адресу страницы", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Дуров" , "data" => "User.parse(\"http://vkontakte.ru/id1\").info.print", "description" => "User.parse(\"http://vkontakte.ru/id1\").info.print"},
+			{"signature" => "Пример. Канделаки" , "data" => "User.parse(\"http://vkontakte.ru/tina_kandelaki\").info.print", "description" => "User.parse(\"http://vkontakte.ru/tina_kandelaki\").info.print"},
+			{"signature" => "Функция Возвращает", "description" => "User"}
+		]
+	},
 	{
 		"signature" => "User.deleted", "data" => '.deleted', "description" => "Заблокирован ли пользователь", 
 		"tips" => 
@@ -328,6 +338,17 @@
 			{"signature" => "Функция Возвращает", "description" => "Album"}
 		]
 	},
+			
+	{
+		"signature" => "Album.remove", "data" => 'Album.remove', "description" => "Удалить альбом", 
+		"tips" => 
+		[
+			{"signature" => "Пример. Удалить мой первый альбом" , "data" => "me.albums[0].remove", "description" => "me.albums[0].remove"},
+			{"signature" => "Пример. Удалить конкретный альбом" , "data" => "me.albums.one(ask_string).remove", "description" => "me.albums.one(ask_string).remove"},
+		]
+	},
+	
+	
 	{
 		"signature" => "Album.upload", "data" => '.upload("Файл", "Описание")', "description" => "Загрузить фотографии в альбом", 
 		"tips" => 

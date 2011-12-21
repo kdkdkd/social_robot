@@ -95,9 +95,9 @@
 
 	me.friends.mail("Спам")
 
-Разослать сообщения людям по результатам поиска:
+Разослать сообщения 100 людям по результатам поиска:
 
-	User.all("Интересы" => "anime", "Страна" => "Украина", "Город" => "Киев").mail("Спам")
+	User.all("anime", 100, {"Страна" => "Украина", "Город" => "Киев"}).invite("Спам")
 	
 Написать сообщение у себя на стене
 
@@ -124,8 +124,11 @@
 Отметить всех друзей на фото. Так как вконтакте не позволяет отмечать на фотографии больше 35 людей, то мы создадим альбом и будем туда загружать одну и ту же фотографию для каждой пачки людей. Отметив их на фото с постером встречи, можно таким образом пригласить их:
 	
 	#Групируем друзей по 35
-	grouped_friends = Array.new([])
-	me.friends.each_with_index{|friend,index| grouped_friends[index/35].push(friend) }
+	grouped_friends = []
+	me.friends.each_with_index do |friend,index| 
+        grouped_friends[index/35] = [] unless grouped_friends[index/35]
+		grouped_friends[index/35].push(friend) 
+	end
 	
 	#Создаем альбом
 	album = Album.create("Встреча в пятницу")
@@ -151,7 +154,7 @@
 Приглашаем друзей в группу:
 
 	#Находим нужную группу
-	group = Groups.parse("http://vkontakte.ru/g238746")
+	group = Group.parse("http://vkontakte.ru/club238746")
 
 	#Рассылаем приглашения
 	group.invite(me.friends)
