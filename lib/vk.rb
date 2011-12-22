@@ -1116,6 +1116,11 @@ module Vkontakte
 			self
 		end
 		
+		def hash_vk_for_user(connector)
+			resp = connector.connect.post('/al_photos.php', {"act" => "show","al" => "1","photo" => "#{album.user.id}_#{id}"})
+			JSON.parse(resp.split("<!>").find{|x| x.index('"id"')}.gsub("<!json>",""))[0]["hash"]
+		end
+	
 		def to_s
 			"#{@id}"
 		end
@@ -1144,9 +1149,75 @@ module Vkontakte
 		
 		def remove
 			return false unless @connect.login
-			log "Deleting photo #{hash}..."
+			log "Deleting photo ..."
 			@connect.post("/al_photos.php",{"act" => "delete_photo", "al" => "1", "hash" => hash_vk, "photo" => "#{album.user.id}_#{id}"})
 		end
+		
+		
+		def mark(users)
+			return false unless @connect.login
+			if(users.class.name == "Array")
+				users_array = users
+			else
+				users_array = [users]
+            end
+			
+			users_array.each do |user_it|
+				log "Marking ..."
+				@connect.post('/al_photos.php', {"act" => "add_tag", "al" => "1", "hash" => hash_vk, "mid" => user_it.id, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
+			end
+		end
+		
+		def unmark(users)
+			return false unless @connect.login
+
+			resp_tags = @connect.post('/al_photos.php', {"act" => "show","al" => "1","photo" => "#{album.user.id}_#{id}"})
+			tagged = JSON.parse(resp_tags.split("<!>").find{|x| x.index('"id"')}.gsub("<!json>",""))[0]["tagged"]
+			
+			
+			if(users.class.name == "Array")
+				users_array = users
+			else
+				users_array = [users]
+            end
+			users_array.each do |user_it|
+				log "Unmarking ..."
+				next if tagged.class.name == "Array"
+				tag = tagged[user_it.id]
+				next unless tag
+				@connect.post('/al_photos.php', {"act" => "delete_tag", "al" => "1", "hash" => hash_vk, "tag" => tag, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
+			end
+		end
+		
+		def like(connector=nil)
+			connect = forсe_login(connector,@connect)
+			if(connector)
+				hash_current = hash_vk_for_user(connector)
+			else
+				hash_current = hash_vk
+			end
+			
+			return false unless connect.login
+			return false unless hash_current
+			log "Like photo ..."
+			res_post = connect.post("/like.php",{"act" => "a_do_like", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
+		end
+		
+		def unlike(connector=nil)
+			connect = forсe_login(connector,@connect)
+			if(connector)
+				hash_current = hash_vk_for_user(connector)
+			else
+				hash_current = hash_vk
+			end
+			
+			
+			return false unless connect.login
+			return false unless hash_current
+			log "Unlike photo ..."
+			res_post = connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
+		end
+		
 		
 	end
 
