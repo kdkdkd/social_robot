@@ -43,6 +43,16 @@ module Vkontakte
 		end
 	end
 	
+	
+	#Ask user to login
+	def ask_phone(*args, &block)
+		if block
+			@@ask_phone_block = block 
+		else
+			@@ask_phone_block.call(*args) if @@ask_phone_block
+		end
+	end
+	
 	#Try to login in any way
 	def forсe_login(connector,self_connect=nil)
 		connect = nil
@@ -235,16 +245,25 @@ module Vkontakte
 					login.email = @login
 				 end.submit
 				 
+
+				 
+				 
 				 @agent.cookies.each do |cookie|
 					@cookie_login = cookie if cookie.name == "remixsid"
 				 end
 				 if @cookie_login
+				    
 					id = check_login
-					save_cookie
-					log "Done"
-					@uid = id
-					
-					return id
+					if(id)
+						save_cookie
+						log "Done"
+						@uid = id
+						return id
+					else
+						#need phone prove
+						log "Failed"
+						return false
+					end
 				 else
 					log "Failed"
 					return false
@@ -650,18 +669,36 @@ module Vkontakte
 		def albums
 			return false unless @connect.login
 			log "List of albums ..."
-			Nokogiri::HTML(@connect.get("/albums#{@id}")).xpath("//div[@class='name']/a").inject([]) do |array,a| 
-				album_delete_hash = nil
-				
-				a.xpath("../..//a").each do |a_delete| 
-					a_delete_onclick = a_delete["onclick"]
-					if(a_delete_onclick && a_delete_onclick.index("photos.deleteAlbum"))
-						album_delete_hash = a_delete_onclick.scan(/\'([^\']+)\'/)[1][0]
-					end
+			offset = 0
+			total_res = []
+			
+			while true
+			    
+			
+				hash_params = {"al" => "1", "offset" => offset.to_s, "part" => "1"}
+				if(offset==0)
+					xml = Nokogiri::HTML(@connect.get("/albums#{@id}"))
+				else
+					xml = Nokogiri::HTML(@connect.post("/albums#{@id}",hash_params).split("<!>").find{|x| x.index "<div"})
 				end
-				array.push(Album.new.set(self,a["href"].scan(/_(\d+)/)[0][0],a.text,album_delete_hash,connect))
-				array
+				
+				current_res = xml.xpath("//div[@class='name']/a").inject([]) do |array,a| 
+					album_delete_hash = nil
+					
+					a.xpath("../..//a").each do |a_delete| 
+						a_delete_onclick = a_delete["onclick"]
+						if(a_delete_onclick && a_delete_onclick.index("photos.deleteAlbum"))
+							album_delete_hash = a_delete_onclick.scan(/\'([^\']+)\'/)[1][0]
+						end
+					end
+					array.push(Album.new.set(self,a["href"].scan(/_(\d+)/)[0][0],a.text,album_delete_hash,connect))
+					array
+				end
+				break if current_res.length == 0
+				total_res += current_res
+				offset+=current_res.length
 			end
+			total_res
 		end
 		
 		
@@ -977,6 +1014,13 @@ module Vkontakte
 		attr_accessor :id, :user, :name, :connect, :delete_hash
 		
 		
+		def Album.parse(href)
+			id_complex = href.split("/album").last.split("_")
+			user = User.id(id_complex.first)
+			user.albums.find{|x| x.id == id_complex.last}
+		end
+		
+		
 		def set(user,id,name,delete_hash,connect)
 			@id = id
 			@name = name
@@ -1114,6 +1158,16 @@ module Vkontakte
 			@link = link
 			@hash_vk = hash_vk
 			self
+		end
+		
+		
+		def Image.parse(href)
+			id_complex = href.split("/photo").last
+			id_complex_split = id_complex.split("_")
+			connect = forсe_login(nil,nil)
+			resp = connect.post('/al_photos.php', {"act" => "show","al" => "1","photo" => id_complex})
+			json = JSON.parse(resp.split("<!>").find{|x| x.index('"id"')}.gsub("<!json>",""))[0]
+			Image.new.set(Album.parse("/" + resp.split("<!>").find{|x| x.index("album")}),id_complex_split.last,json["x_src"],json["hash"],connect)
 		end
 		
 		def hash_vk_for_user(connector)
