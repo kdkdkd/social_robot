@@ -325,7 +325,7 @@ module Vkontakte
 		
 		
 		def Music.all(q, connector=nil)
-		    connect = forсe_login(connector)
+		  connect = forсe_login(connector)
 			
 			html = Nokogiri::HTML(connect.post('/al_search.php',{"al" => "1", "c[q]" => q, "c[section]" => "audio", "c[sort]" => "2"}).split("<!>")[6].gsub("<!-- ->->",""))
 			res = []
@@ -334,7 +334,7 @@ module Vkontakte
 				if(dur.length>0)
 					res.push(Music.new.set(
 						table.xpath(".//input[@type='hidden']/@id").text.scan(/audio_info(\d+\_\d+)/)[0][0],
-						table.xpath(".//div[@class='audio_title_wrap']//span").find{|span| span["id"].start_with?("title")}.text,
+						table.xpath(".//div[@class='audio_title_wrap']//span").find{|span| (!span["id"].nil?) && span["id"].start_with?("title")}.text,
 						table.xpath(".//div[@class='audio_title_wrap']//a").first.text,
 						table.xpath(".//input[@type='hidden']/@value").text.split(",")[0],
 						dur.text,
@@ -400,12 +400,12 @@ module Vkontakte
 	end
 	
 	class Group
-		attr_accessor :connect, :id, :type
+		attr_accessor :connect, :id
 		
-		def set(id,name=nil,type=:club,connect=nil)
+		def set(id,name=nil,connect=nil)
 			@id = id.to_s
 			@name = name
-			@type=type
+
 			@connect = (connect)?connect:Vkontakte::last_connect
 			self
 		end
@@ -416,12 +416,12 @@ module Vkontakte
 			@name
 		end
 	
-	    def to_s
-			(@name)? "#{@name}(#{type.to_s}#{@id})" : "#{type.to_s}#{@id}"
+	  def to_s
+			(@name)? "#{@name}(#{@id})" : "#{@id}"
 		end
 		
 		def uniq_id
-			type.to_s + id
+			id
 		end
 		
 		def ==(other)
@@ -439,7 +439,7 @@ module Vkontakte
 		def info(connector=nil)
 			connect = forсe_login(connector,@connect)
 			log "Fetching info..."
-			href = "/#{type}#{id}" 
+			href = "/club#{id}"
 			resp = connect.get(href)
 			begin
 				@group_hash = resp.scan(Regexp.new("#{id}\,\s*\'([^\']*)\'"))[0][0]
@@ -459,9 +459,9 @@ module Vkontakte
 		def Group.parse(href,connector=nil)
 			connect = forсe_login(connector)
 			if(href.index("/club"))
-				Group.new.set(href.split("/club").last,nil,:club,connect)
+				Group.new.set(href.split("/club").last,nil,connect)
 			elsif (href.index("/event"))
-				Group.new.set(href.split("/event").last,nil,:event,connect)
+				Group.new.set(href.split("/event").last,nil,connect)
 			end
 		end
 		
@@ -480,12 +480,9 @@ module Vkontakte
 			@connect = forсe_login(connector,@connect)
 			return unless group_hash
 			log "Leaving group ..."
-			if(type == :club)
-				connect.post('/al_groups.php',{"act" => "leave", "al" => "1", "gid" => id , "hash" => group_hash})
-			elsif(type == :event)
 				connect.post('/al_groups.php',{"act" => "enter", "context" => "_decline" ,"al" => "1", "gid" => id , "hash" => group_hash})
-			end
-			@connect = old_connect
+			  connect.post('/al_groups.php',{"act" => "leave", "al" => "1", "gid" => id , "hash" => group_hash})
+      @connect = old_connect
 		end
 		
 		
@@ -497,7 +494,6 @@ module Vkontakte
 			invite_box = @connect.post('/al_page.php', {'act' => 'a_invite_box', 'al' => '1', 'gid' => id})
 			
 			invite_box.scan(/page\.inviteToGroup\(([^\)]*)\)/).each do |arg|
-				log arg
 				args = arg[0].split(",").map{|x|x.strip}
 				correct_args = args.find{|x| x = user.id}
 				if(correct_args)
@@ -916,18 +912,8 @@ module Vkontakte
 			return false unless @connect.login
 			log "List of groups..."
 			res = []
-			Nokogiri::HTML(@connect.get('/groups?id='+id)).xpath('//a').each do |a| 
-				text_strip = a.text.strip
-				unless(text_strip.empty?)
-					href = a["href"]
-					type = nil
-					if href && href =~ /\/club\d+/
-						type = :club
-					elsif href && href =~ /\/event\d+/
-						type = :event
-					end
-					res.push Group.new.set(href.gsub("/event","").gsub("/club",""),a.text.strip,type,@connect) if type
-				end
+			JSON.parse(@connect.post('/al_groups.php', {"act" => "get_list", "al" => "1", "mid" => id, "tab" => "groups"}).split("<!>").find{|x| x.index("<!json>")}.gsub("<!json>","")).each do |el|
+				 res.push Group.new.set(el[2].to_s,el[0],@connect)
 			end
 			res.uniq!
 			res

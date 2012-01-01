@@ -20,7 +20,7 @@ $app = Qt::Application.new(ARGV)
 
 
 class SocialRobot < Qt::MainWindow
-	slots    'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
+	slots    'toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
 
 	#Create gui and set timer
 	def initialize()
@@ -30,9 +30,10 @@ class SocialRobot < Qt::MainWindow
 		#Create main widgets and dock interface 
 		resize(800, 600)
 		log_dock = Qt::DockWidget.new("Лог", self)
-		help_dock = Qt::DockWidget.new("Помощь", self)
+		@help_dock = Qt::DockWidget.new("Помощь", self)
 
 		@code_edit = Qt::TextEdit.new
+		
 		HighlighterRuby.new(@code_edit.document)
 		@code_edit.plainText = "#Список друзей\nme.friends.print"
 		@log_edit = Qt::TextEdit.new
@@ -53,14 +54,14 @@ class SocialRobot < Qt::MainWindow
 		#Assign widgets to docks
 		log_dock.widget = @log_edit
 			addDockWidget(Qt::BottomDockWidgetArea, log_dock)
-		help_dock.widget = @help_tree
-			addDockWidget(Qt::RightDockWidgetArea, help_dock)
+		@help_dock.widget = @help_tree
+			addDockWidget(Qt::RightDockWidgetArea, @help_dock)
 
 
 
 		#Allow dock widgets to be movable
 		log_dock.Features = 2
-		help_dock.Features = 2
+		@help_dock.Features = 2
 
 
 		#Fill help tree
@@ -164,6 +165,10 @@ class SocialRobot < Qt::MainWindow
 		@open_settings_action = Qt::Action.new("Настройки", self)
 		@open_settings_action.statusTip = "Настройки"
 		connect(@open_settings_action, SIGNAL('triggered()'), self, SLOT('open_settings()'))
+		
+		@developer_mode_action = Qt::Action.new(Qt::Icon.new("images/developer.png"),"Режим разработчика", self)
+		@developer_mode_action.statusTip = "Режим разработчика"
+		connect(@developer_mode_action, SIGNAL('triggered()'), self, SLOT('toggle_developer_mode()'))
 
 		
 		@exit_action = Qt::Action.new("Выход", self)
@@ -176,10 +181,11 @@ class SocialRobot < Qt::MainWindow
 		@fileMenu.addAction(@new_action)
 		@fileMenu.addAction(@save_action)
 		@fileMenu.addAction(@open_action)
+		
 		@fileMenu.addAction(@run_action)
 		@fileMenu.addAction(@stop_action)
-    	@fileMenu.addAction(@loot_action)
-	    @fileMenu.addAction(@kill_session_action)
+    @fileMenu.addAction(@loot_action)
+	  @fileMenu.addAction(@kill_session_action)
 		@fileMenu.addAction(@open_settings_action)
 		@fileMenu.addAction(@exit_action)
 		
@@ -187,14 +193,15 @@ class SocialRobot < Qt::MainWindow
 		generate_menu(menuBar().addMenu("Мои скрипты"),'../../my')
 		
 		
-		file_toolbar = addToolBar("File")
-		file_toolbar.addAction(@new_action)
-		file_toolbar.addAction(@save_action)
-		file_toolbar.addAction(@open_action)
+		@file_toolbar = addToolBar("File")
+		@file_toolbar.addAction(@new_action)
+		@file_toolbar.addAction(@save_action)
+		@file_toolbar.addAction(@open_action)
 
-		run_toolbar = addToolBar("Run")
-		run_toolbar.addAction(@run_action)
-		run_toolbar.addAction(@stop_action)
+		@run_toolbar = addToolBar("Run")
+		@run_toolbar.addAction(@run_action)
+		@run_toolbar.addAction(@stop_action)
+		@run_toolbar.addAction(@developer_mode_action)
 
 
 		statusBar().showMessage("")
@@ -245,6 +252,39 @@ class SocialRobot < Qt::MainWindow
 		@timer.start
 
 		log_small("Добро пожаловать мастер. Готов служить ...")
+		
+		update_developer_mode()
+	end
+	
+	#toggle developer mode
+	def toggle_developer_mode()
+		if(Settings["developer_mode"] == "true")
+			Settings["developer_mode"] = "false"
+		else
+			Settings["developer_mode"] = "true"
+		end
+		Settings.save
+		update_developer_mode()
+	end
+	
+	
+	#update developer mode
+	def update_developer_mode()
+		if(Settings["developer_mode"] == "true")
+			@code_edit.Visible = true
+			@help_dock.Visible = true
+      @file_toolbar.Visible = true
+      @save_action.Visible = true
+      @open_action.Visible = true
+      @new_action.Visible = true
+		else
+			@code_edit.Visible = false
+			@help_dock.Visible = false
+      @file_toolbar.Visible = false
+      @save_action.Visible = false
+      @open_action.Visible = false
+      @new_action.Visible = false
+		end
 	end
 	
 	#Generate menu
@@ -292,6 +332,12 @@ class SocialRobot < Qt::MainWindow
 		text = IO.read(str)
 		text.force_encoding("UTF-8")
 		@code_edit.plainText = text
+    @changed = false
+		if Settings["developer_mode"] == "false"
+		    @thread.kill if @thread
+			run_gui(true)
+			run_script
+		end
 	end
 	
 	#Open loot folder
