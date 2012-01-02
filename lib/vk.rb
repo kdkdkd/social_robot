@@ -225,6 +225,10 @@ module Vkontakte
 		#Make POST request and resolve answer in special way
 		def silent_post(href, params)
 			resp_post = post(href, params)
+			silent(resp_post)
+    end
+
+    def silent(resp_post)
 			resp = resp_post.split("<!>").find{|str| str.start_with?('{"all":')}.gsub(/^\{\"all\"\:/,'').gsub(/}$/,'').gsub("\r","").gsub("\n","")
 			eval("resp=#{resp}")
 			resp
@@ -275,7 +279,7 @@ module Vkontakte
 	end
 	
 	class Music
-		attr_accessor :id,:name,:author,:link,:duration,:connect
+		attr_accessor :id,:name,:author,:link,:duration,:connect, :delete_hash
 		
 		def set(id,name,author,link,duration,connect)
 			id_split = id.split("_")
@@ -395,7 +399,13 @@ module Vkontakte
 			end
 			res_total
 		end
-		
+
+    def remove
+      return false unless @connect.login
+      return false unless delete_hash
+      log "Deleting music..."
+      @connect.post('/audio',{'act' => 'delete_audio', 'aid' => id ,'al' => '1', 'hash' => delete_hash, 'oid' => @user_id, 'restore' => '1'})
+    end
 		
 	end
 	
@@ -658,8 +668,10 @@ module Vkontakte
 			log "List of music..."
 			q = {"act" => "load_audios_silent","al" => "1"}
 			q["id"]=@id unless @me
-			
-			@connect.silent_post('/audio', q ).map{|x| Music.new.set_array(x,@connect)}
+
+      res = @connect.post('/audio', q )
+      music_delete_hash = res.scan(/\"delete_hash\"\:\"([^\"]+)\"/)[0][0]
+			@connect.silent(res).map{|x| m = Music.new.set_array(x,@connect);m .delete_hash=music_delete_hash; m}
 		end
 		
 		def albums
