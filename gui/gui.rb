@@ -20,7 +20,7 @@ $app = Qt::Application.new(ARGV)
 
 
 class SocialRobot < Qt::MainWindow
-	slots    'toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
+	slots    'link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
 
 	#Create gui and set timer
 	def initialize()
@@ -36,12 +36,18 @@ class SocialRobot < Qt::MainWindow
 		
 		HighlighterRuby.new(@code_edit.document)
 		@code_edit.plainText = "#Список друзей\nme.friends.print"
-		@log_edit = Qt::TextEdit.new
+		@log_edit = Qt::TextBrowser.new
+		@log_edit.openExternalLinks = false
+		@log_edit.openLinks = false
+		connect(@log_edit,SIGNAL('anchorClicked( const QUrl & )'),self,SLOT('link_clicked( const QUrl & )'))
 		@help_tree = Qt::TreeWidget.new
+    @log_edit.setStyleSheet("QTextBrowser{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
+    @code_edit.setStyleSheet("QTextEdit{font: 15px;background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
+    @help_tree.setStyleSheet("QTreeWidget{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
 
 
 		#Properties of main widgets
-		@code_edit.setStyleSheet("font: 15px;")
+		#@code_edit.setStyleSheet("font: 15px;")
 		connect(@code_edit,SIGNAL('textChanged()'),self,SLOT('code_changed()'))
 		@code_edit.acceptRichText = false
 		@code_edit.lineWrapMode = 0
@@ -251,10 +257,17 @@ class SocialRobot < Qt::MainWindow
 		Qt::Object.connect(@timer, SIGNAL("timeout()"), invoke, SLOT("invoke()"))
 		@timer.start
 
-		log_small("Добро пожаловать мастер. Готов служить ...")
+		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Вконтакте -> Музыка -> Cкачать мою музыку</i><br/><br/>Создавать свои программы можно нажав кнопку <img src=\"images/developer.png\"/> в меню.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net/vkontakte/usage\">http://socialrobot.net</a>")
 		
 		update_developer_mode()
 	end
+	
+	#When user clics on link
+	def link_clicked(url)
+		Qt::DesktopServices::openUrl(url)
+	end
+	
+	
 	
 	#toggle developer mode
 	def toggle_developer_mode()
@@ -277,6 +290,7 @@ class SocialRobot < Qt::MainWindow
       @save_action.Visible = true
       @open_action.Visible = true
       @new_action.Visible = true
+      @run_action.Visible = true
 		else
 			@code_edit.Visible = false
 			@help_dock.Visible = false
@@ -284,6 +298,7 @@ class SocialRobot < Qt::MainWindow
       @save_action.Visible = false
       @open_action.Visible = false
       @new_action.Visible = false
+      @run_action.Visible = false
 		end
 	end
 	
@@ -332,9 +347,12 @@ class SocialRobot < Qt::MainWindow
 		text = IO.read(str)
 		text.force_encoding("UTF-8")
 		@code_edit.plainText = text
-    @changed = false
+        @changed = false
 		if Settings["developer_mode"] == "false"
-		    @thread.kill if @thread
+		  @thread.kill if @thread
+      while @thread && @thread.alive? do
+        sleep 0.1
+      end
 			run_gui(true)
 			run_script
 		end
@@ -346,6 +364,9 @@ class SocialRobot < Qt::MainWindow
 		Qt::DesktopServices::openUrl(Qt::Url.new("file:///#{path}"));
 	end
 
+	def open(path)
+		Qt::DesktopServices::openUrl(Qt::Url.new("file:///#{path}"));
+	end
 
 	#Log with red color
 	def log_error(text)
@@ -498,7 +519,10 @@ class SocialRobot < Qt::MainWindow
 					use_anonymizer
 				else
 					force_location
-				end
+        end
+        Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
+        Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
+        Vkontakte.like_interval = Settings["like_interval"].to_f
 				eval(script)
 				robot.log_success "Выполнено"
 				@disable_run_gui = true
@@ -576,54 +600,65 @@ class SocialRobot < Qt::MainWindow
 				param_real = param.dup
 				param_real.force_encoding("UTF-8")
 				label.text = param_real
-			end
-			case params[param]
-				when "string"
-					input = Qt::LineEdit.new
-					
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				when "int"
-					input = Qt::SpinBox.new
-					input.minimum = 0
-					input.value = 1
-					
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				when "pass"
-					input = Qt::LineEdit.new
-					input.EchoMode = Qt::LineEdit::Password
-			
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				when "files"
-					hlayout = Qt::HBoxLayout.new
-					input = Qt::LineEdit.new
-					button = Qt::PushButton.new
-					@controls_hash[button] = input
-					button.text = "..."
-					
-					hlayout.addWidget(input)
-					hlayout.addWidget(button)
-					connect(button,SIGNAL('clicked()'),self,SLOT('open_files_clicked()'))
-					controls.push(button)
-					layout.addLayout(hlayout,index,1)
-				when "file"
-					hlayout = Qt::HBoxLayout.new
-					input = Qt::LineEdit.new
-					button = Qt::PushButton.new
-					@controls_hash[button] = input
-					button.text = "..."
-					
-					hlayout.addWidget(input)
-					hlayout.addWidget(button)
-					connect(button,SIGNAL('clicked()'),self,SLOT('open_file_clicked()'))
-					controls.push(input)
-					layout.addLayout(hlayout,index,1)
-				else
-					input = Qt::LineEdit.new
-					
-			end
+      end
+      value_hash = params[param]
+      if(value_hash.class.name == "Hash")
+         if value_hash["Type"] == "combo"
+           input = Qt::ComboBox.new
+           value_hash["Values"].each{|x|input.insertItem(0,x)}
+           controls.push(input)
+           layout.addWidget(input,index,1)
+         end
+      else
+        case value_hash
+          when {}
+          when "string"
+            input = Qt::LineEdit.new
+
+            controls.push(input)
+            layout.addWidget(input,index,1)
+          when "int"
+            input = Qt::SpinBox.new
+            input.minimum = 0
+            input.value = 1
+
+            controls.push(input)
+            layout.addWidget(input,index,1)
+          when "pass"
+            input = Qt::LineEdit.new
+            input.EchoMode = Qt::LineEdit::Password
+
+            controls.push(input)
+            layout.addWidget(input,index,1)
+          when "files"
+            hlayout = Qt::HBoxLayout.new
+            input = Qt::LineEdit.new
+            button = Qt::PushButton.new
+            @controls_hash[button] = input
+            button.text = "..."
+
+            hlayout.addWidget(input)
+            hlayout.addWidget(button)
+            connect(button,SIGNAL('clicked()'),self,SLOT('open_files_clicked()'))
+            controls.push(button)
+            layout.addLayout(hlayout,index,1)
+          when "file"
+            hlayout = Qt::HBoxLayout.new
+            input = Qt::LineEdit.new
+            button = Qt::PushButton.new
+            @controls_hash[button] = input
+            button.text = "..."
+
+            hlayout.addWidget(input)
+            hlayout.addWidget(button)
+            connect(button,SIGNAL('clicked()'),self,SLOT('open_file_clicked()'))
+            controls.push(input)
+            layout.addLayout(hlayout,index,1)
+          else
+            input = Qt::LineEdit.new
+
+        end
+      end
 			
 			
 			
@@ -658,7 +693,10 @@ class SocialRobot < Qt::MainWindow
 					text = @controls_hash[control].text
 					text.force_encoding("UTF-8")
 					res.push(text.split("|"))
-				
+        when /ComboBox/
+          text = control.currentText
+          text.force_encoding("UTF-8")
+          res.push(text)
 			end
 		end
 		
@@ -755,14 +793,14 @@ widget.raise
 
 
 
-#splash = "../splash/pid.txt"
-# if File.exist?(splash)
-#	begin
-#		Process.kill "KILL", IO.read(splash).to_i
-#	rescue
-#	end
-#	File.delete(splash)
- #end
+splash = "../../splash/pid.txt"
+ if File.exist?(splash)
+	begin
+		Process.kill "KILL", IO.read(splash).to_i
+	rescue
+	end
+	File.delete(splash)
+ end
 	
 $app.exec
 

@@ -1,12 +1,12 @@
-#Показать список друзей
-me.friends.print
+#Список друзей
+list = me.friends
 
-#Спросить имя друга
-name = ask("Имя друга"=>"string")[0]
+#Имена друзей
+names = list.map{|friend| friend.name}
 
-#Найти друга
-friend = me.friends.one(name)
-log friend
+#Выбрать друга
+name = ask("Имя друга"=>{"Type" => "combo","Values" => names })[0]
+friend = list.one(name)
 
-#Скачать фотки
+#Качаем фотки
 friend.albums.photos.download

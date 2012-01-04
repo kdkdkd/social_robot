@@ -11,8 +11,24 @@ module Vkontakte
 	def log(*args, &block)
 		@@log_block = block if block
 		@@log_block.call args[0] if args.length>0 && @@log_block
-	end
-	
+  end
+
+
+  @@user_fetch_interval = 2.1
+	def user_fetch_interval=(value)
+     @@user_fetch_interval=value
+  end
+
+  @@photo_mark_interval = 5
+	def photo_mark_interval=(value)
+     @@photo_mark_interval=value
+  end
+
+
+  @@like_interval = 1
+	def like_interval=(value)
+     @@like_interval=value
+  end
 	
 	#which page is to refer all reqests
 	@@vkontakte_location_var = "http://vkontakte.ru"
@@ -105,7 +121,7 @@ module Vkontakte
 	
 	class Connect
 		attr_reader :uid
-		
+		attr_accessor :last_user_mark_photo, :last_user_like
 		
 		def cookie
 			@cookie_login
@@ -113,6 +129,8 @@ module Vkontakte
 		
 		def initialize(login = nil, password = nil)
 			@agent = Mechanize.new { |agent|  agent.user_agent_alias = 'Mac Safari'	}
+            @agent.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+            @agent.agent.http.retry_change_requests = true
 			@login = login
 			@password = password
 			Vkontakte::last_connect = self
@@ -135,7 +153,7 @@ module Vkontakte
 		def check_login
 			begin
 				resp = get("/feed")
-				id = User.get_id_by_response(resp)
+				id = User.get_id_by_feed(resp)
 				@uid = id
 				return id
 			rescue
@@ -182,7 +200,7 @@ module Vkontakte
 		def get_user(id)
 			if(@last_user_fetch_date)
 				diff = Time.new - @last_user_fetch_date
-				sleep(2.1 - diff) if(diff<2.1)
+				sleep(@@user_fetch_interval - diff) if(diff<@@user_fetch_interval)
 			end
 			
 			not_ok = true			
@@ -320,7 +338,8 @@ module Vkontakte
 		
 		def download
 			return false unless @connect.login
-			@connect.save(@link,"music","#{@author}_#{@name}_#{id}.mp3")
+			res = @connect.save(@link,"music","#{@author}_#{@name}_#{id}.mp3")
+      res
 		end
 		
 		def owner
@@ -521,7 +540,11 @@ module Vkontakte
 	class User
 		attr_accessor :me, :connect
 		
-		def User.get_id_by_response(resp)
+		def User.get_id_by_user_page(resp)
+			resp.scan(/\"user_id\"\:\"([^\"]*)\"/)[0][0]
+		end
+		
+		def User.get_id_by_feed(resp)
 			resp.scan(/id\:\s*([^\,]*)\,/)[0][0]
 		end
 		
@@ -637,7 +660,7 @@ module Vkontakte
 			log "Fetching info ..."
 			
 			resp = @connect.get_user(@id.to_s)
-			@id = User.get_id_by_response(resp) unless @id.to_s =~ /^\d+$/
+			@id = User.get_id_by_user_page(resp) unless @id.to_s =~ /^\d+$/
 			html = Nokogiri::HTML(resp)
 			name_new = html.xpath("//title").text
 			@name = name_new
@@ -667,10 +690,10 @@ module Vkontakte
 			return false unless @connect.login
 			log "List of music..."
 			q = {"act" => "load_audios_silent","al" => "1"}
-			q["id"]=@id unless @me
+			q["id"]=id unless @me
 
-      res = @connect.post('/audio', q )
-      music_delete_hash = res.scan(/\"delete_hash\"\:\"([^\"]+)\"/)[0][0]
+            res = @connect.post('/audio', q )
+            music_delete_hash = res.scan(/\"delete_hash\"\:\"([^\"]+)\"/)[0][0]
 			@connect.silent(res).map{|x| m = Music.new.set_array(x,@connect);m .delete_hash=music_delete_hash; m}
 		end
 		
@@ -685,9 +708,9 @@ module Vkontakte
 			
 				hash_params = {"al" => "1", "offset" => offset.to_s, "part" => "1"}
 				if(offset==0)
-					xml = Nokogiri::HTML(@connect.get("/albums#{@id}"))
+					xml = Nokogiri::HTML(@connect.get("/albums#{id}"))
 				else
-					xml = Nokogiri::HTML(@connect.post("/albums#{@id}",hash_params).split("<!>").find{|x| x.index "<div"})
+					xml = Nokogiri::HTML(@connect.post("/albums#{id}",hash_params).split("<!>").find{|x| x.index "<div"})
 				end
 				
 				current_res = xml.xpath("//div[@class='name']/a").inject([]) do |array,a| 
@@ -1083,7 +1106,7 @@ module Vkontakte
 				addr = post.scan(/flashLiteUrl\s*\=\s*([^\;]+)/)[0][0].gsub("\"",'').gsub("'",'').gsub("\\",'')
 				
 				params = {"oid" => user.id, "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "rhash" => rhash, "act" => "do_add", "ajx" => "1"}
-				f = File.new(filename, "rb")
+	      f = File.new(filename, "rb")
 				params["photo"] = f
 				
 				#Uploading photo
@@ -1208,6 +1231,8 @@ module Vkontakte
 		
 		def mark(users)
 			return false unless @connect.login
+
+
 			if(users.class.name == "Array")
 				users_array = users
 			else
@@ -1215,8 +1240,13 @@ module Vkontakte
             end
 			
 			users_array.each do |user_it|
+        if(@connect.last_user_mark_photo)
+				    diff = Time.new - @connect.last_user_mark_photo
+				    sleep(@@photo_mark_interval - diff) if(diff<@@photo_mark_interval)
+			  end
 				log "Marking ..."
 				@connect.post('/al_photos.php', {"act" => "add_tag", "al" => "1", "hash" => hash_vk, "mid" => user_it.id, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
+        @connect.last_user_mark_photo = Time.new
 			end
 		end
 		
@@ -1251,8 +1281,13 @@ module Vkontakte
 			
 			return false unless connect.login
 			return false unless hash_current
+       if(@connect.last_user_like)
+				    diff = Time.new - @connect.last_user_like
+				    sleep(@@like_interval - diff) if(diff<@@like_interval)
+			  end
 			log "Like photo ..."
 			res_post = connect.post("/like.php",{"act" => "a_do_like", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
+      @connect.last_user_like = Time.new
 		end
 		
 		def unlike(connector=nil)
@@ -1266,8 +1301,13 @@ module Vkontakte
 			
 			return false unless connect.login
 			return false unless hash_current
+       if(@connect.last_user_like)
+				    diff = Time.new - @connect.last_user_like
+				    sleep(@@like_interval - diff) if(diff<@@like_interval)
+			  end
 			log "Unlike photo ..."
 			res_post = connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
+      @connect.last_user_like = Time.new
 		end
 		
 		

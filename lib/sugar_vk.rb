@@ -1,6 +1,6 @@
 class Array
-	def download(*params)
-		self.each{|x| x.download(*params) if x.respond_to?('download')}
+  def download(*params)
+		self.inject([]){|a,x| a.push(x.download(*params)) if x.respond_to?('download');a}.uniq
 	end
 	def mark(*params)
 		self.each{|x| x.mark(*params) if x.respond_to?('mark')}
