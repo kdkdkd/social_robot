@@ -5,7 +5,7 @@
 
 Как установить?
 ---------------
-Воспользоваться установщиком по адресу https://github.com/downloads/kdkdkd/social_robot/socialrobot.exe
+Воспользоваться установщиком по адресу http://socialrobot.net/download/socialrobot.exe
 Программа устанавливается за 2 минуты, работает без настройки, и самообновляется, как google chrome.
 
 
@@ -97,7 +97,7 @@
 
 Разослать сообщения 100 людям по результатам поиска:
 
-	User.all("anime", 100, {"Страна" => "Украина", "Город" => "Киев"}).invite("Спам")
+	User.all("anime", 100, 0, {"Страна" => "Украина", "Город" => "Киев"}).invite("Спам")
 	
 Написать сообщение у себя на стене
 
@@ -126,26 +126,29 @@
 	#Групируем друзей по 35
 	grouped_friends = []
 	me.friends.each_with_index do |friend,index| 
-        grouped_friends[index/35] = [] unless grouped_friends[index/35]
+		grouped_friends[index/35] = [] unless grouped_friends[index/35]
 		grouped_friends[index/35].push(friend) 
 	end
-	
+
+	#Спросить о названиии альбома и фотографии
+	result_ask = ask({"Название альбома" => "string", "Файл с изображением" => "file"})
+	result_album = result_ask[0]
+	result_file = result_ask[1]
+
 	#Создаем альбом
-	album = Album.create("Встреча в пятницу")
-	
-	#Выбираем какое фото будем заливать
-	photo_location = ask_file
-	
+	album = Album.create(result_album,"")
+
 	#Для каждой группы
-	grouped_friends.each do |friends_group|
-		
+	grouped_friends.each_with_index do |friends_group,index|
+
+	   
+
 		#Загружем фото
-		photo = Album.upload(photo_location)
-		
+		photo = album.upload(result_file,"")
+
 		#Отмечаем всех людей на фото
 		photo.mark(friends_group)
 	end
-	
 	
 
 
@@ -163,7 +166,7 @@
 Пишем стандартный инвайтер: приглашаем к себе в друзья фанатов аниме:
 
 	#Найти 100 фанов аниме:
-	anime_fans = User.all("anime", 100, {"Страна" => "Украина", "Город" => "Киев"})
+	anime_fans = User.all("anime", 100, 0, {"Страна" => "Украина", "Город" => "Киев"})
 	
 	#Пригласить их в друзья
 	anime_fans.invite("Давай дружить!!!")
@@ -174,15 +177,24 @@
 Найти людей по интересам и собрать их мобильные телефоны:
 	
 	#Список 100 пользователей интересующихся программированием
-	programmers = User.all("Программирование", 100, {"Страна" => "Украина", "Город" => "Киев"})
+	programmers = User.all("Программирование", 100, 0, {"Страна" => "Украина", "Город" => "Киев"})
 	
-	#Для каждого програмиста
-	programmers.each do |programmer| 
-	
-		#Вывести его телефон
-		programmer.info["Моб. телефон"].print
-	end
+	#Для каждого человека
+	programmers.each do |user| 
 
+		#Получить информацию о человеке
+		phone = user.info["Моб. телефон"]
+
+		#Продолжать если не указан мобильник
+		next if phone.nil?
+		
+		#Убрать все не цифры в телефоне
+		phone.gsub!(/[^\d]/,"")
+
+		#Вывести телефон, если в нем содержится достаточно букв
+		phone.print if(phone.length>=10)
+
+	end
 Теперь можно разослать смс каждому из них.
 
 

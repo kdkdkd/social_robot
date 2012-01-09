@@ -257,9 +257,12 @@ class SocialRobot < Qt::MainWindow
 		Qt::Object.connect(@timer, SIGNAL("timeout()"), invoke, SLOT("invoke()"))
 		@timer.start
 
-		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Вконтакте -> Музыка -> Cкачать мою музыку</i><br/><br/>Создавать свои программы можно нажав кнопку <img src=\"images/developer.png\"/> в меню.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net/vkontakte/usage\">http://socialrobot.net</a>")
+		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Вконтакте -> Музыка -> Cкачать мою музыку</i><br/><br/>Создавать свои программы можно нажав кнопку <img src=\"images/developer.png\"/> в меню.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net/vkontakte\">http://socialrobot.net</a>")
 		
 		update_developer_mode()
+
+    #Remember user input
+    @memory_input = {}
 	end
 	
 	#When user clics on link
@@ -366,7 +369,11 @@ class SocialRobot < Qt::MainWindow
 
 	def open(path)
 		Qt::DesktopServices::openUrl(Qt::Url.new("file:///#{path}"));
-	end
+  end
+
+  def notify
+    open(File.expand_path("./sounds/notification.mp3"))
+  end
 
 	#Log with red color
 	def log_error(text)
@@ -523,6 +530,10 @@ class SocialRobot < Qt::MainWindow
         Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
         Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
         Vkontakte.like_interval = Settings["like_interval"].to_f
+        Vkontakte.mail_interval = Settings["mail_interval"].to_f
+        Vkontakte.post_interval = Settings["post_interval"].to_f
+        Vkontakte.invite_interval = Settings["invite_interval"].to_f
+
 				eval(script)
 				robot.log_success "Выполнено"
 				@disable_run_gui = true
@@ -559,7 +570,46 @@ class SocialRobot < Qt::MainWindow
 	#Shortcut to ask
 	def ask_string(str = "Введите строку")
 		ask(str => "string")[0]
-	end
+  end
+
+  #Shortcut to ask
+	def ask_text(str = "Введите текст")
+		ask(str => "text")[0]
+  end
+
+  def ask_peoples
+
+   r = ask(
+     "Критерий(Имя или интерес)" => "string" ,
+     "Искать по.." => {"Type" => "combo","Values" => ["По интересам","По имени"] },
+     "Сортировать по.." => {"Type" => "combo","Values" => ["По рейтингу","По дате регистрации"] },
+     "Страна" => {"Type" => "combo","Values" => ["Не важно"] + Vkontakte.countries.keys },
+     "Город" => "string" ,
+     "Количество результатов" => {"Type" => "int","Default" => 100, "Minimum" => 1 },
+     "Начиная с..." => {"Type" => "int","Default" => 0, "Minimum" => 0, "Maximum" => 999 },
+     "Пол"=>{"Type" => "combo","Values" => ["Не важно","Мужской","Женский"] },
+     "Онлайн"=>{"Type" => "combo","Values" => ["Не важно","Только онлайн"] },
+     "От"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a },
+     "До"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a }
+   )
+
+    q = { }
+
+
+    q["Страна"] = r[3] if r[3] != "Не важно"
+    q["Город"] = r[4] if r[4].length>0
+
+    q["Пол"] = r[7] if r[7] != "Не важно"
+    q["Онлайн"] = "Да" if r[8] != "Не важно"
+    q["От"] =  r[9] if r[9] != "Не важно"
+    q["До"] =  r[10] if r[10] != "Не важно"
+    q["По имени"] =  (r[1] == "По имени")?"Да":"Нет"
+    q["По дате"] =  (r[2] == "По дате регистрации")?"Да":"Нет"
+
+
+    res = User.all(r[0],r[5],r[6],q)
+    res
+   end
 	
 	#Shortcut to ask
     def ask_file(str = "Выберите файл")
@@ -587,8 +637,10 @@ class SocialRobot < Qt::MainWindow
 		index = 0
 		controls = []
 		@controls_hash = {}
+    label_hash = {}
 		params.each_key do |param| 
-			if param.class.name == "Hash"
+			param_label = nil
+      if param.class.name == "Hash"
 				if(param["type"]=="Image")
 					pixmap = Qt::Pixmap.new("../../loot/captcha/#{param["Path"]}.png")
 					label = Qt::Label.new;
@@ -598,29 +650,60 @@ class SocialRobot < Qt::MainWindow
 			else
 				label = Qt::Label.new
 				param_real = param.dup
+        param_label = param_real.dup
 				param_real.force_encoding("UTF-8")
 				label.text = param_real
       end
       value_hash = params[param]
+      input = nil
+      default = @memory_input[param_label]
       if(value_hash.class.name == "Hash")
          if value_hash["Type"] == "combo"
            input = Qt::ComboBox.new
-           value_hash["Values"].each{|x|input.insertItem(0,x)}
+
+           selected_item_index = -1
+           value_hash["Values"].each_with_index{|x,i|input.insertItem(i,x.to_s);selected_item_index = i if x.to_s == default.to_s}
+           input.setCurrentIndex(selected_item_index) if selected_item_index>=0
            controls.push(input)
            layout.addWidget(input,index,1)
+         elsif value_hash["Type"] == "int"
+            input = Qt::SpinBox.new
+            input.minimum = value_hash["Minimum"] if value_hash["Minimum"]
+
+            input.maximum = 99999
+            input.maximum = value_hash["Maximum"] if value_hash["Maximum"]
+            input.value = value_hash["Default"] if value_hash["Default"]
+
+            input.value = default if(default && default.class.name == "Fixnum")
+
+            controls.push(input)
+            layout.addWidget(input,index,1)
          end
       else
+
         case value_hash
-          when {}
+          when "check"
+            input = Qt::CheckBox.new
+            input.checked = default == true
+            controls.push(input)
+            layout.addWidget(input,index,1)
+          when "text"
+            input = Qt::TextEdit.new
+
+            input.plainText = default.to_s if(default)
+            controls.push(input)
+            layout.addWidget(input,index,1)
           when "string"
             input = Qt::LineEdit.new
-
+            input.text = default.to_s if(default)
             controls.push(input)
             layout.addWidget(input,index,1)
           when "int"
             input = Qt::SpinBox.new
             input.minimum = 0
+            input.maximum = 99999
             input.value = 1
+            input.value = default if(default && default.class.name == "Fixnum")
 
             controls.push(input)
             layout.addWidget(input,index,1)
@@ -636,8 +719,9 @@ class SocialRobot < Qt::MainWindow
             button = Qt::PushButton.new
             @controls_hash[button] = input
             button.text = "..."
-
+            input.text = default.to_s if(default)
             hlayout.addWidget(input)
+
             hlayout.addWidget(button)
             connect(button,SIGNAL('clicked()'),self,SLOT('open_files_clicked()'))
             controls.push(button)
@@ -648,7 +732,7 @@ class SocialRobot < Qt::MainWindow
             button = Qt::PushButton.new
             @controls_hash[button] = input
             button.text = "..."
-
+            input.text = default.to_s if(default)
             hlayout.addWidget(input)
             hlayout.addWidget(button)
             connect(button,SIGNAL('clicked()'),self,SLOT('open_file_clicked()'))
@@ -656,10 +740,12 @@ class SocialRobot < Qt::MainWindow
             layout.addLayout(hlayout,index,1)
           else
             input = Qt::LineEdit.new
-
+            input.text = default.to_s if(default)
         end
+
+
       end
-			
+			label_hash[input] = param_label if(!param_label.nil? && !input.nil?)
 			
 			
 			
@@ -681,12 +767,17 @@ class SocialRobot < Qt::MainWindow
 		ask.exec
 		res = []
 		controls.each do |control|
-			
+
 			case control.class.name
+        when /TextEdit/
+          push_value = (control.plainText)
+					push_value.force_encoding("UTF-8")
+					res.push(push_value)
 				when /LineEdit/
 					push_value = (control.text)
 					push_value.force_encoding("UTF-8")
 					res.push(push_value)
+
 				when /SpinBox/
 					res.push(control.value)
 				when /PushButton/
@@ -697,7 +788,14 @@ class SocialRobot < Qt::MainWindow
           text = control.currentText
           text.force_encoding("UTF-8")
           res.push(text)
-			end
+        when /CheckBox/
+          res.push(control.checked)
+
+      end
+
+        string_label = label_hash[control]
+        @memory_input[string_label] = res.last if(string_label)
+
 		end
 		
 		@timer.start

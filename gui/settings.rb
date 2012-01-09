@@ -74,14 +74,37 @@ class SettingsWindow
 
 
     like_interval_label = Qt::Label.new
-		like_interval_label.text = "Интервал между лайком"
+		like_interval_label.text = "Интервал между лайками"
 		layout.addWidget(like_interval_label,3,0)
 		like_interval_ceckbox = Qt::DoubleSpinBox.new
 		like_interval_ceckbox.value  = Settings["like_interval"].to_f
 		layout.addWidget(like_interval_ceckbox,3,1)
+
+    mail_interval_label = Qt::Label.new
+		mail_interval_label.text = "Интервал между почтой"
+		layout.addWidget(mail_interval_label,4,0)
+		mail_interval_ceckbox = Qt::DoubleSpinBox.new
+		mail_interval_ceckbox.value  = Settings["mail_interval"].to_f
+		layout.addWidget(mail_interval_ceckbox,4,1)
+
+
+    post_interval_label = Qt::Label.new
+		post_interval_label.text = "Интервал между сообщениями на стене"
+		layout.addWidget(post_interval_label,5,0)
+		post_interval_ceckbox = Qt::DoubleSpinBox.new
+		post_interval_ceckbox.value  = Settings["post_interval"].to_f
+		layout.addWidget(post_interval_ceckbox,5,1)
+
+
+    invite_interval_label = Qt::Label.new
+		invite_interval_label.text = "Интервал между приглашениями"
+		layout.addWidget(invite_interval_label,6,0)
+		invite_interval_ceckbox = Qt::DoubleSpinBox.new
+		invite_interval_ceckbox.value  = Settings["invite_interval"].to_f
+		layout.addWidget(invite_interval_ceckbox,6,1)
 		
 		exit_button = Qt::PushButton.new("Ок",window)
-		layout.addWidget(exit_button,4,1,Qt::AlignRight)
+		layout.addWidget(exit_button,7,1,Qt::AlignRight)
 		window.connect(exit_button,SIGNAL('clicked()'),window,SLOT('accept()'))	
 		
 		
@@ -95,6 +118,9 @@ class SettingsWindow
       Settings["user_fetch_interval"] = user_fetch_interval_ceckbox.value.to_s
       Settings["photo_mark_interval"] = photo_mark_interval_ceckbox.value.to_s
       Settings["like_interval"] = like_interval_ceckbox.value.to_s
+      Settings["mail_interval"] = mail_interval_ceckbox.value.to_s
+      Settings["post_interval"] = post_interval_ceckbox.value.to_s
+      Settings["invite_interval"] = invite_interval_ceckbox.value.to_s
 			Settings.save		
 		end
 	end

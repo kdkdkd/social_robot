@@ -55,7 +55,7 @@ class Array
 		b = "["
 		b.print_indentation = print_indentation
 		res << b.pretty_string << "\n"
-		self.each_with_index{|xm,i| x = xm.dup;x.print_indentation = print_indentation + 1; res << x.pretty_string;  res << "," if i < length - 1  ;res<<"\n"}
+		self.each_with_index{|xm,i| x = xm.to_s.dup;x.print_indentation = print_indentation + 1; res << x.pretty_string;  res << "," if i < length - 1  ;res<<"\n"}
 		
 		b = "]"
 		b.print_indentation = print_indentation
@@ -72,7 +72,7 @@ class Hash
 		res << b.pretty_string << "\n"
 		i = 0
 		self.each do |xm,ym| 
-			x = xm.dup;y = ym.dup
+			x = xm.to_s.dup;y = ym.to_s.dup
 			y.print_indentation = 0;
 			x.print_indentation = print_indentation + 1
 			

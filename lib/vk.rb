@@ -5,7 +5,9 @@ require 'json'
 module Vkontakte
 
 	@@countries = {"\u0423\u043A\u0440\u0430\u0438\u043D\u0430"=>2, "\u0410\u0432\u0441\u0442\u0440\u0430\u043B\u0438\u044F"=>19, "\u0410\u0432\u0441\u0442\u0440\u0438\u044F"=>20, "\u0410\u0437\u0435\u0440\u0431\u0430\u0439\u0434\u0436\u0430\u043D"=>5, "\u0410\u043B\u0431\u0430\u043D\u0438\u044F"=>21, "\u0410\u043B\u0436\u0438\u0440"=>22, "\u0410\u043C\u0435\u0440\u0438\u043A\u0430\u043D\u0441\u043A\u043E\u0435 \u0421\u0430\u043C\u043E\u0430"=>23, "\u0410\u043D\u0433\u0438\u043B\u044C\u044F"=>24, "\u0410\u043D\u0433\u043E\u043B\u0430"=>25, "\u0410\u043D\u0434\u043E\u0440\u0440\u0430"=>26, "\u0410\u043D\u0442\u0438\u0433\u0443\u0430 \u0438 \u0411\u0430\u0440\u0431\u0443\u0434\u0430"=>27, "\u0410\u0440\u0433\u0435\u043D\u0442\u0438\u043D\u0430"=>28, "\u0410\u0440\u043C\u0435\u043D\u0438\u044F"=>6, "\u0410\u0440\u0443\u0431\u0430"=>29, "\u0410\u0444\u0433\u0430\u043D\u0438\u0441\u0442\u0430\u043D"=>30, "\u0411\u0430\u0433\u0430\u043C\u044B"=>31, "\u0411\u0430\u043D\u0433\u043B\u0430\u0434\u0435\u0448"=>32, "\u0411\u0430\u0440\u0431\u0430\u0434\u043E\u0441"=>33, "\u0411\u0430\u0445\u0440\u0435\u0439\u043D"=>34, "\u0411\u0435\u043B\u0430\u0440\u0443\u0441\u044C"=>3, "\u0411\u0435\u043B\u0438\u0437"=>35, "\u0411\u0435\u043B\u044C\u0433\u0438\u044F"=>36, "\u0411\u0435\u043D\u0438\u043D"=>37, "\u0411\u0435\u0440\u043C\u0443\u0434\u044B"=>38, "\u0411\u043E\u043B\u0433\u0430\u0440\u0438\u044F"=>39, "\u0411\u043E\u043B\u0438\u0432\u0438\u044F"=>40, "\u0411\u043E\u0441\u043D\u0438\u044F \u0438 \u0413\u0435\u0440\u0446\u0435\u0433\u043E\u0432\u0438\u043D\u0430"=>41, "\u0411\u043E\u0442\u0441\u0432\u0430\u043D\u0430"=>42, "\u0411\u0440\u0430\u0437\u0438\u043B\u0438\u044F"=>43, "\u0411\u0440\u0443\u043D\u0435\u0439-\u0414\u0430\u0440\u0443\u0441\u0441\u0430\u043B\u0430\u043C"=>44, "\u0411\u0443\u0440\u043A\u0438\u043D\u0430-\u0424\u0430\u0441\u043E"=>45, "\u0411\u0443\u0440\u0443\u043D\u0434\u0438"=>46, "\u0411\u0443\u0442\u0430\u043D"=>47, "\u0412\u0430\u043D\u0443\u0430\u0442\u0443"=>48, "\u0412\u0435\u043B\u0438\u043A\u043E\u0431\u0440\u0438\u0442\u0430\u043D\u0438\u044F"=>49, "\u0412\u0435\u043D\u0433\u0440\u0438\u044F"=>50, "\u0412\u0435\u043D\u0435\u0441\u0443\u044D\u043B\u0430"=>51, "\u0412\u0438\u0440\u0433\u0438\u043D\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430, \u0411\u0440\u0438\u0442\u0430\u043D\u0441\u043A\u0438\u0435"=>52, "\u0412\u0438\u0440\u0433\u0438\u043D\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430, \u0421\u0428\u0410"=>53, "\u0412\u043E\u0441\u0442\u043E\u0447\u043D\u044B\u0439 \u0422\u0438\u043C\u043E\u0440"=>54, "\u0412\u044C\u0435\u0442\u043D\u0430\u043C"=>55, "\u0413\u0430\u0431\u043E\u043D"=>56, "\u0413\u0430\u0438\u0442\u0438"=>57, "\u0413\u0430\u0439\u0430\u043D\u0430"=>58, "\u0413\u0430\u043C\u0431\u0438\u044F"=>59, "\u0413\u0430\u043D\u0430"=>60, "\u0413\u0432\u0430\u0434\u0435\u043B\u0443\u043F\u0430"=>61, "\u0413\u0432\u0430\u0442\u0435\u043C\u0430\u043B\u0430"=>62, "\u0413\u0432\u0438\u043D\u0435\u044F"=>63, "\u0413\u0432\u0438\u043D\u0435\u044F-\u0411\u0438\u0441\u0430\u0443"=>64, "\u0413\u0435\u0440\u043C\u0430\u043D\u0438\u044F"=>65, "\u0413\u0438\u0431\u0440\u0430\u043B\u0442\u0430\u0440"=>66, "\u0413\u043E\u043D\u0434\u0443\u0440\u0430\u0441"=>67, "\u0413\u043E\u043D\u043A\u043E\u043D\u0433"=>68, "\u0413\u0440\u0435\u043D\u0430\u0434\u0430"=>69, "\u0413\u0440\u0435\u043D\u043B\u0430\u043D\u0434\u0438\u044F"=>70, "\u0413\u0440\u0435\u0446\u0438\u044F"=>71, "\u0413\u0440\u0443\u0437\u0438\u044F"=>7, "\u0413\u0443\u0430\u043C"=>72, "\u0414\u0430\u043D\u0438\u044F"=>73, "\u0414\u0436\u0438\u0431\u0443\u0442\u0438"=>231, "\u0414\u043E\u043C\u0438\u043D\u0438\u043A\u0430"=>74, "\u0414\u043E\u043C\u0438\u043D\u0438\u043A\u0430\u043D\u0441\u043A\u0430\u044F \u0420\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>75, "\u0415\u0433\u0438\u043F\u0435\u0442"=>76, "\u0417\u0430\u043C\u0431\u0438\u044F"=>77, "\u0417\u0430\u043F\u0430\u0434\u043D\u0430\u044F \u0421\u0430\u0445\u0430\u0440\u0430"=>78, "\u0417\u0438\u043C\u0431\u0430\u0431\u0432\u0435"=>79, "\u0418\u0437\u0440\u0430\u0438\u043B\u044C"=>8, "\u0418\u043D\u0434\u0438\u044F"=>80, "\u0418\u043D\u0434\u043E\u043D\u0435\u0437\u0438\u044F"=>81, "\u0418\u043E\u0440\u0434\u0430\u043D\u0438\u044F"=>82, "\u0418\u0440\u0430\u043A"=>83, "\u0418\u0440\u0430\u043D"=>84, "\u0418\u0440\u043B\u0430\u043D\u0434\u0438\u044F"=>85, "\u0418\u0441\u043B\u0430\u043D\u0434\u0438\u044F"=>86, "\u0418\u0441\u043F\u0430\u043D\u0438\u044F"=>87, "\u0418\u0442\u0430\u043B\u0438\u044F"=>88, "\u0419\u0435\u043C\u0435\u043D"=>89, "\u041A\u0430\u0431\u043E-\u0412\u0435\u0440\u0434\u0435"=>90, "\u041A\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043D"=>4, "\u041A\u0430\u043C\u0431\u043E\u0434\u0436\u0430"=>91, "\u041A\u0430\u043C\u0435\u0440\u0443\u043D"=>92, "\u041A\u0430\u043D\u0430\u0434\u0430"=>10, "\u041A\u0430\u0442\u0430\u0440"=>93, "\u041A\u0435\u043D\u0438\u044F"=>94, "\u041A\u0438\u043F\u0440"=>95, "\u041A\u0438\u0440\u0438\u0431\u0430\u0442\u0438"=>96, "\u041A\u0438\u0442\u0430\u0439"=>97, "\u041A\u043E\u043B\u0443\u043C\u0431\u0438\u044F"=>98, "\u041A\u043E\u043C\u043E\u0440\u044B"=>99, "\u041A\u043E\u043D\u0433\u043E"=>100, "\u041A\u043E\u043D\u0433\u043E, \u0434\u0435\u043C\u043E\u043A\u0440\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u0440\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>101, "\u041A\u043E\u0441\u0442\u0430-\u0420\u0438\u043A\u0430"=>102, "\u041A\u043E\u0442 \u0434`\u0418\u0432\u0443\u0430\u0440"=>103, "\u041A\u0443\u0431\u0430"=>104, "\u041A\u0443\u0432\u0435\u0439\u0442"=>105, "\u041A\u044B\u0440\u0433\u044B\u0437\u0441\u0442\u0430\u043D"=>11, "\u041B\u0430\u043E\u0441"=>106, "\u041B\u0430\u0442\u0432\u0438\u044F"=>12, "\u041B\u0435\u0441\u043E\u0442\u043E"=>107, "\u041B\u0438\u0431\u0435\u0440\u0438\u044F"=>108, "\u041B\u0438\u0432\u0430\u043D"=>109, "\u041B\u0438\u0432\u0438\u0439\u0441\u043A\u0430\u044F \u0410\u0440\u0430\u0431\u0441\u043A\u0430\u044F \u0414\u0436\u0430\u043C\u0430\u0445\u0438\u0440\u0438\u044F"=>110, "\u041B\u0438\u0442\u0432\u0430"=>13, "\u041B\u0438\u0445\u0442\u0435\u043D\u0448\u0442\u0435\u0439\u043D"=>111, "\u041B\u044E\u043A\u0441\u0435\u043C\u0431\u0443\u0440\u0433"=>112, "\u041C\u0430\u0432\u0440\u0438\u043A\u0438\u0439"=>113, "\u041C\u0430\u0432\u0440\u0438\u0442\u0430\u043D\u0438\u044F"=>114, "\u041C\u0430\u0434\u0430\u0433\u0430\u0441\u043A\u0430\u0440"=>115, "\u041C\u0430\u043A\u0430\u043E"=>116, "\u041C\u0430\u043A\u0435\u0434\u043E\u043D\u0438\u044F"=>117, "\u041C\u0430\u043B\u0430\u0432\u0438"=>118, "\u041C\u0430\u043B\u0430\u0439\u0437\u0438\u044F"=>119, "\u041C\u0430\u043B\u0438"=>120, "\u041C\u0430\u043B\u044C\u0434\u0438\u0432\u044B"=>121, "\u041C\u0430\u043B\u044C\u0442\u0430"=>122, "\u041C\u0430\u0440\u043E\u043A\u043A\u043E"=>123, "\u041C\u0430\u0440\u0442\u0438\u043D\u0438\u043A\u0430"=>124, "\u041C\u0430\u0440\u0448\u0430\u043B\u043B\u043E\u0432\u044B \u041E\u0441\u0442\u0440\u043E\u0432\u0430"=>125, "\u041C\u0435\u043A\u0441\u0438\u043A\u0430"=>126, "\u041C\u0438\u043A\u0440\u043E\u043D\u0435\u0437\u0438\u044F, \u0444\u0435\u0434\u0435\u0440\u0430\u0442\u0438\u0432\u043D\u044B\u0435 \u0448\u0442\u0430\u0442\u044B"=>127, "\u041C\u043E\u0437\u0430\u043C\u0431\u0438\u043A"=>128, "\u041C\u043E\u043B\u0434\u043E\u0432\u0430"=>15, "\u041C\u043E\u043D\u0430\u043A\u043E"=>129, "\u041C\u043E\u043D\u0433\u043E\u043B\u0438\u044F"=>130, "\u041C\u043E\u043D\u0442\u0441\u0435\u0440\u0440\u0430\u0442"=>131, "\u041C\u044C\u044F\u043D\u043C\u0430"=>132, "\u041D\u0430\u043C\u0438\u0431\u0438\u044F"=>133, "\u041D\u0430\u0443\u0440\u0443"=>134, "\u041D\u0435\u043F\u0430\u043B"=>135, "\u041D\u0438\u0433\u0435\u0440"=>136, "\u041D\u0438\u0433\u0435\u0440\u0438\u044F"=>137, "\u041D\u0438\u0434\u0435\u0440\u043B\u0430\u043D\u0434\u0441\u043A\u0438\u0435 \u0410\u043D\u0442\u0438\u043B\u044B"=>138, "\u041D\u0438\u0434\u0435\u0440\u043B\u0430\u043D\u0434\u044B"=>139, "\u041D\u0438\u043A\u0430\u0440\u0430\u0433\u0443\u0430"=>140, "\u041D\u0438\u0443\u044D"=>141, "\u041D\u043E\u0432\u0430\u044F \u0417\u0435\u043B\u0430\u043D\u0434\u0438\u044F"=>142, "\u041D\u043E\u0432\u0430\u044F \u041A\u0430\u043B\u0435\u0434\u043E\u043D\u0438\u044F"=>143, "\u041D\u043E\u0440\u0432\u0435\u0433\u0438\u044F"=>144, "\u041E\u0431\u044A\u0435\u0434\u0438\u043D\u0435\u043D\u043D\u044B\u0435 \u0410\u0440\u0430\u0431\u0441\u043A\u0438\u0435 \u042D\u043C\u0438\u0440\u0430\u0442\u044B"=>145, "\u041E\u043C\u0430\u043D"=>146, "\u041E\u0441\u0442\u0440\u043E\u0432 \u041C\u044D\u043D"=>147, "\u041E\u0441\u0442\u0440\u043E\u0432 \u041D\u043E\u0440\u0444\u043E\u043B\u043A"=>148, "\u041E\u0441\u0442\u0440\u043E\u0432\u0430 \u041A\u0430\u0439\u043C\u0430\u043D"=>149, "\u041E\u0441\u0442\u0440\u043E\u0432\u0430 \u041A\u0443\u043A\u0430"=>150, "\u041E\u0441\u0442\u0440\u043E\u0432\u0430 \u0422\u0435\u0440\u043A\u0441 \u0438 \u041A\u0430\u0439\u043A\u043E\u0441"=>151, "\u041F\u0430\u043A\u0438\u0441\u0442\u0430\u043D"=>152, "\u041F\u0430\u043B\u0430\u0443"=>153, "\u041F\u0430\u043B\u0435\u0441\u0442\u0438\u043D\u0441\u043A\u0430\u044F \u0430\u0432\u0442\u043E\u043D\u043E\u043C\u0438\u044F"=>154, "\u041F\u0430\u043D\u0430\u043C\u0430"=>155, "\u041F\u0430\u043F\u0443\u0430 - \u041D\u043E\u0432\u0430\u044F \u0413\u0432\u0438\u043D\u0435\u044F"=>156, "\u041F\u0430\u0440\u0430\u0433\u0432\u0430\u0439"=>157, "\u041F\u0435\u0440\u0443"=>158, "\u041F\u0438\u0442\u043A\u0435\u0440\u043D"=>159, "\u041F\u043E\u043B\u044C\u0448\u0430"=>160, "\u041F\u043E\u0440\u0442\u0443\u0433\u0430\u043B\u0438\u044F"=>161, "\u041F\u0443\u044D\u0440\u0442\u043E-\u0420\u0438\u043A\u043E"=>162, "\u0420\u0435\u044E\u043D\u044C\u043E\u043D"=>163, "\u0420\u043E\u0441\u0441\u0438\u044F"=>1, "\u0420\u0443\u0430\u043D\u0434\u0430"=>164, "\u0420\u0443\u043C\u044B\u043D\u0438\u044F"=>165, "\u0421\u0428\u0410"=>9, "\u0421\u0430\u043B\u044C\u0432\u0430\u0434\u043E\u0440"=>166, "\u0421\u0430\u043C\u043E\u0430"=>167, "\u0421\u0430\u043D-\u041C\u0430\u0440\u0438\u043D\u043E"=>168, "\u0421\u0430\u043D-\u0422\u043E\u043C\u0435 \u0438 \u041F\u0440\u0438\u043D\u0441\u0438\u043F\u0438"=>169, "\u0421\u0430\u0443\u0434\u043E\u0432\u0441\u043A\u0430\u044F \u0410\u0440\u0430\u0432\u0438\u044F"=>170, "\u0421\u0432\u0430\u0437\u0438\u043B\u0435\u043D\u0434"=>171, "\u0421\u0432\u044F\u0442\u0430\u044F \u0415\u043B\u0435\u043D\u0430"=>172, "\u0421\u0435\u0432\u0435\u0440\u043D\u0430\u044F \u041A\u043E\u0440\u0435\u044F"=>173, "\u0421\u0435\u0432\u0435\u0440\u043D\u044B\u0435 \u041C\u0430\u0440\u0438\u0430\u043D\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430"=>174, "\u0421\u0435\u0439\u0448\u0435\u043B\u044B"=>175, "\u0421\u0435\u043D\u0435\u0433\u0430\u043B"=>176, "\u0421\u0435\u043D\u0442-\u0412\u0438\u043D\u0441\u0435\u043D\u0442"=>177, "\u0421\u0435\u043D\u0442-\u041A\u0438\u0442\u0441 \u0438 \u041D\u0435\u0432\u0438\u0441"=>178, "\u0421\u0435\u043D\u0442-\u041B\u044E\u0441\u0438\u044F"=>179, "\u0421\u0435\u043D\u0442-\u041F\u044C\u0435\u0440 \u0438 \u041C\u0438\u043A\u0435\u043B\u043E\u043D"=>180, "\u0421\u0435\u0440\u0431\u0438\u044F"=>181, "\u0421\u0438\u043D\u0433\u0430\u043F\u0443\u0440"=>182, "\u0421\u0438\u0440\u0438\u0439\u0441\u043A\u0430\u044F \u0410\u0440\u0430\u0431\u0441\u043A\u0430\u044F \u0420\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>183, "\u0421\u043B\u043E\u0432\u0430\u043A\u0438\u044F"=>184, "\u0421\u043B\u043E\u0432\u0435\u043D\u0438\u044F"=>185, "\u0421\u043E\u043B\u043E\u043C\u043E\u043D\u043E\u0432\u044B \u041E\u0441\u0442\u0440\u043E\u0432\u0430"=>186, "\u0421\u043E\u043C\u0430\u043B\u0438"=>187, "\u0421\u0443\u0434\u0430\u043D"=>188, "\u0421\u0443\u0440\u0438\u043D\u0430\u043C"=>189, "\u0421\u044C\u0435\u0440\u0440\u0430-\u041B\u0435\u043E\u043D\u0435"=>190, "\u0422\u0430\u0434\u0436\u0438\u043A\u0438\u0441\u0442\u0430\u043D"=>16, "\u0422\u0430\u0438\u043B\u0430\u043D\u0434"=>191, "\u0422\u0430\u0439\u0432\u0430\u043D\u044C"=>192, "\u0422\u0430\u043D\u0437\u0430\u043D\u0438\u044F"=>193, "\u0422\u043E\u0433\u043E"=>194, "\u0422\u043E\u043A\u0435\u043B\u0430\u0443"=>195, "\u0422\u043E\u043D\u0433\u0430"=>196, "\u0422\u0440\u0438\u043D\u0438\u0434\u0430\u0434 \u0438 \u0422\u043E\u0431\u0430\u0433\u043E"=>197, "\u0422\u0443\u0432\u0430\u043B\u0443"=>198, "\u0422\u0443\u043D\u0438\u0441"=>199, "\u0422\u0443\u0440\u043A\u043C\u0435\u043D\u0438\u044F"=>17, "\u0422\u0443\u0440\u0446\u0438\u044F"=>200, "\u0423\u0433\u0430\u043D\u0434\u0430"=>201, "\u0423\u0437\u0431\u0435\u043A\u0438\u0441\u0442\u0430\u043D"=>18, "\u0423\u043E\u043B\u043B\u0438\u0441 \u0438 \u0424\u0443\u0442\u0443\u043D\u0430"=>202, "\u0423\u0440\u0443\u0433\u0432\u0430\u0439"=>203, "\u0424\u0430\u0440\u0435\u0440\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430"=>204, "\u0424\u0438\u0434\u0436\u0438"=>205, "\u0424\u0438\u043B\u0438\u043F\u043F\u0438\u043D\u044B"=>206, "\u0424\u0438\u043D\u043B\u044F\u043D\u0434\u0438\u044F"=>207, "\u0424\u043E\u043B\u043A\u043B\u0435\u043D\u0434\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430"=>208, "\u0424\u0440\u0430\u043D\u0446\u0438\u044F"=>209, "\u0424\u0440\u0430\u043D\u0446\u0443\u0437\u0441\u043A\u0430\u044F \u0413\u0432\u0438\u0430\u043D\u0430"=>210, "\u0424\u0440\u0430\u043D\u0446\u0443\u0437\u0441\u043A\u0430\u044F \u041F\u043E\u043B\u0438\u043D\u0435\u0437\u0438\u044F"=>211, "\u0425\u043E\u0440\u0432\u0430\u0442\u0438\u044F"=>212, "\u0426\u0435\u043D\u0442\u0440\u0430\u043B\u044C\u043D\u043E-\u0410\u0444\u0440\u0438\u043A\u0430\u043D\u0441\u043A\u0430\u044F \u0420\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>213, "\u0427\u0430\u0434"=>214, "\u0427\u0435\u0440\u043D\u043E\u0433\u043E\u0440\u0438\u044F"=>230, "\u0427\u0435\u0445\u0438\u044F"=>215, "\u0427\u0438\u043B\u0438"=>216, "\u0428\u0432\u0435\u0439\u0446\u0430\u0440\u0438\u044F"=>217, "\u0428\u0432\u0435\u0446\u0438\u044F"=>218, "\u0428\u043F\u0438\u0446\u0431\u0435\u0440\u0433\u0435\u043D \u0438 \u042F\u043D \u041C\u0430\u0439\u0435\u043D"=>219, "\u0428\u0440\u0438-\u041B\u0430\u043D\u043A\u0430"=>220, "\u042D\u043A\u0432\u0430\u0434\u043E\u0440"=>221, "\u042D\u043A\u0432\u0430\u0442\u043E\u0440\u0438\u0430\u043B\u044C\u043D\u0430\u044F \u0413\u0432\u0438\u043D\u0435\u044F"=>222, "\u042D\u0440\u0438\u0442\u0440\u0435\u044F"=>223, "\u042D\u0441\u0442\u043E\u043D\u0438\u044F"=>14, "\u042D\u0444\u0438\u043E\u043F\u0438\u044F"=>224, "\u042E\u0436\u043D\u0430\u044F \u041A\u043E\u0440\u0435\u044F"=>226, "\u042E\u0436\u043D\u043E-\u0410\u0444\u0440\u0438\u043A\u0430\u043D\u0441\u043A\u0430\u044F \u0420\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>227, "\u042F\u043C\u0430\u0439\u043A\u0430"=>228, "\u042F\u043F\u043E\u043D\u0438\u044F"=>229}
-
+  def countries
+    @@countries
+  end
 
 	#Output message from system
 	def log(*args, &block)
@@ -29,6 +31,22 @@ module Vkontakte
 	def like_interval=(value)
      @@like_interval=value
   end
+
+  @@mail_interval = 3
+	def mail_interval=(value)
+     @@mail_interval=value
+  end
+
+  @@post_interval = 4
+	def post_interval=(value)
+     @@post_interval=value
+  end
+
+  @@invite_interval = 8
+	def invite_interval=(value)
+     @@invite_interval=value
+  end
+
 	
 	#which page is to refer all reqests
 	@@vkontakte_location_var = "http://vkontakte.ru"
@@ -121,7 +139,7 @@ module Vkontakte
 	
 	class Connect
 		attr_reader :uid
-		attr_accessor :last_user_mark_photo, :last_user_like
+		attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite
 		
 		def cookie
 			@cookie_login
@@ -190,7 +208,11 @@ module Vkontakte
 		
 		#Make GET request
 		def get(href)
-			res = @agent.get(addr(href),[],nil,{'cookie' => @cookie_login}).body
+			begin
+          res = @agent.get(addr(href),[],nil,{'cookie' => @cookie_login}).body
+      rescue
+          return nil
+      end
 			res.force_encoding("cp1251")
 			res = res.encode("utf-8")
 			res
@@ -208,7 +230,7 @@ module Vkontakte
 			while not_ok do
 				addr_of_user = (id =~ /^\d+$/)?("/id" + id):("/" + id)
 				res = get(addr_of_user)
-				
+				return nil if res.nil?
 				if(res.index('"post_hash"') || res.index('"profile_deleted_text"'))
 					not_ok = false
 				else
@@ -219,7 +241,23 @@ module Vkontakte
 			@last_user_fetch_date = Time.new
 			res
 		end
-		
+
+		#Fetch group page
+		def get_group(id)
+			if(@last_user_fetch_date)
+				diff = Time.new - @last_user_fetch_date
+				sleep(@@user_fetch_interval - diff) if(diff<@@user_fetch_interval)
+			end
+      if id =~ /^\d+$/
+			  href = "/club#{id}"
+      else
+        href = "/#{id}"
+      end
+			res = get(href)
+			@last_user_fetch_date = Time.new
+			res
+		end
+
 		
 		#Add vkontakte.ru to address
 		def addr(rel = "")
@@ -429,16 +467,29 @@ module Vkontakte
 	end
 	
 	class Group
-		attr_accessor :connect, :id
+		attr_accessor :connect
 		
 		def set(id,name=nil,connect=nil)
 			@id = id.to_s
 			@name = name
+      @open = "unknown"
 
 			@connect = (connect)?connect:Vkontakte::last_connect
 			self
+    end
+
+    def id
+			return nil if @id.nil?
+      @id = @id.to_s
+			return @id if @id =~ /^\d+$/
+			info
+			@id
 		end
-		
+
+    def Group.get_id_by_group_page(resp)
+			resp.scan(/\"group_id\"\:\"?([\d]*)?/)[0][0]
+    end
+
 		def name
 			return @name if @name 
 			info
@@ -450,7 +501,7 @@ module Vkontakte
 		end
 		
 		def uniq_id
-			id
+			@id
 		end
 		
 		def ==(other)
@@ -468,15 +519,28 @@ module Vkontakte
 		def info(connector=nil)
 			connect = forсe_login(connector,@connect)
 			log "Fetching info..."
-			href = "/club#{id}"
-			resp = connect.get(href)
+
+			resp = connect.get_group(@id)
+      begin
+				@id = Group.get_id_by_group_page(resp)
+        @name = Nokogiri::HTML(resp).xpath("//title").text unless @name
+			rescue
+				@id = nil
+        return
+      end
+      @open = resp.index("Открытая группа")
 			begin
-				@group_hash = resp.scan(Regexp.new("#{id}\,\s*\'([^\']*)\'"))[0][0]
+				@group_hash = resp.scan(Regexp.new("#{@id}\,\s*\'([^\']*)\'"))[0][0]
 			rescue
 				@group_hash = nil
-			end
-			
-			@name = Nokogiri::HTML(resp).xpath("//title").text unless @name
+      end
+
+
+
+    end
+
+    def Group.id(id_set)
+			Group.new.set(id_set,nil,forсe_login(nil))
 		end
 		
 		def group_hash
@@ -491,8 +555,20 @@ module Vkontakte
 				Group.new.set(href.split("/club").last,nil,connect)
 			elsif (href.index("/event"))
 				Group.new.set(href.split("/event").last,nil,connect)
+      elsif
+        id = href.split("/").last
+        res = Group.new.set(id,nil,connect)
+        res.info
+        return nil if id.nil?
+        return res
 			end
-		end
+    end
+
+    def open
+       @open if @open != "unknown"
+       info
+       @open
+    end
 		
 		def enter(connector=nil)
 			old_connect = @connect
@@ -518,6 +594,10 @@ module Vkontakte
 		def invite(user,connector=nil)
 			old_connect = @connect
 			@connect = forсe_login(connector,@connect)
+      if(@connect.last_user_invite)
+				    diff = Time.new - @connect.last_user_invite
+				    sleep(@@invite_interval - diff) if(diff<@@invite_interval)
+			end
 			log "Inviting to group ..."
 			
 			invite_box = @connect.post('/al_page.php', {'act' => 'a_invite_box', 'al' => '1', 'gid' => id})
@@ -530,7 +610,7 @@ module Vkontakte
 					@connect.post('/al_page.php', {'act' => 'a_invite', 'al' => '1', 'gid' => id, "hash" => hash, "mid" => user.id}).scan("page.inviteToGroup\(([^\)]*)\)")
 				end
 			end
-			
+			@connect.last_user_invite = Time.new
 			@connect = old_connect
 		end
 	
@@ -541,7 +621,7 @@ module Vkontakte
 		attr_accessor :me, :connect
 		
 		def User.get_id_by_user_page(resp)
-			resp.scan(/\"user_id\"\:\"([^\"]*)\"/)[0][0]
+			resp.scan(/\"user_id\"\:\"?([^\"]*)\"?/)[0][0]
 		end
 		
 		def User.get_id_by_feed(resp)
@@ -554,17 +634,39 @@ module Vkontakte
 		end
 		
 		def id
-			@id = @id.to_s
+			return nil if @id.nil?
+      @id = @id.to_s
 			return @id if @id =~ /^\d+$/
 			info
 			@id
-		end
+    end
+
+
+    def avatar
+      return @avatar if @avatar.to_s != "unknown"
+      info unless @avatar_string
+      if @avatar_string
+			  @avatar = Image.parse(@avatar_string)
+      else
+        @avatar = nil
+      end
+      @avatar
+    end
 		
 		def name
 			return @name if @name
 			info
 			@name
-		end
+    end
+
+    def online
+      return true if @me
+      @info = nil
+			info
+			@online
+    end
+
+
 		
 		def deleted
 			return @deleted if @deleted == true || @deleted == false
@@ -583,9 +685,17 @@ module Vkontakte
 			info
 			@friend_hash
 		end
-		
+
+    def initialize
+      @online = "unknown"
+      @avatar = "unknown"
+    end
+
+
+
 		def set(id,name=nil,connect=nil)
-			@id = id.to_s
+
+      @id = id.to_s
 			@name = name
 			@connect = (connect)?connect:Vkontakte::last_connect;
 			@me = false
@@ -626,7 +736,7 @@ module Vkontakte
 		end
 		
 		def uniq_id
-			id
+			@id
 		end
 		
 		def ==(other)
@@ -634,7 +744,7 @@ module Vkontakte
 		end
 		
 		def hash
-			self.id.hash
+			@id.hash
 		end
 		 
 		def eql?(other)
@@ -656,10 +766,15 @@ module Vkontakte
 		
 		def info
 			return @info if @info
-			return false unless @connect.login
+			return {} unless @connect.login
 			log "Fetching info ..."
 			
 			resp = @connect.get_user(@id.to_s)
+      if resp.nil?
+        @id = nil
+        return {}
+      end
+      @online = !resp.index("<b class=\"fl_r\">Online</b>").nil?
 			@id = User.get_id_by_user_page(resp) unless @id.to_s =~ /^\d+$/
 			html = Nokogiri::HTML(resp)
 			name_new = html.xpath("//title").text
@@ -669,10 +784,14 @@ module Vkontakte
 			if @deleted
 				@post_hash = nil
 				@info = {}
-				return
+				return @info
 			end
 			@post_hash = User.get_post_hash(resp)
-			
+      begin
+			  @avatar_string = html.xpath("//div[@id='profile_avatar']/a[@id='profile_photo_link']")[0]["href"]
+      rescue
+        @avatar_string = nil
+      end
 			begin 
 				@friend_hash = resp.scan(/toggleFriend\(this\,\s*\'([^\']*)\'/)[0][0]
 			rescue
@@ -736,11 +855,16 @@ module Vkontakte
 		def post(msg,connector=nil)
 			connect_old = @connect
 			@connect = forсe_login(connector,@connect)
+      if(@connect.last_user_post)
+				    diff = Time.new - @connect.last_user_post
+				    sleep(@@post_interval - diff) if(diff<@@post_interval)
+			end
+
 			log "Posting ..."
 			captcha_sid = nil
 			captcha_key = nil
 			@post_hash = nil
-            while true
+      while true
 				hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id, "type" => "all" }
 				unless(captcha_key.nil?)
 					hash["captcha_sid"] = captcha_sid
@@ -749,18 +873,30 @@ module Vkontakte
 				res = @connect.post('/al_wall.php', hash)
 				if(res.index("<!json>"))
 					html_text = res.split("<!>").find{|x| x.index('"post_table"')}
-					return Post.parse_html(Nokogiri::HTML(html_text.gsub("<!-- ->->","")),self,@connect)
+					return_value = Post.parse_html(Nokogiri::HTML(html_text.gsub("<!-- ->->","")),self,@connect)
+          break
 				else
 					a = res.split("<!>")
 					captcha_sid = a[a.length-2]
+          if captcha_sid.to_i < 100
+            return_value = nil
+            break
+          end
 					captcha_key = @connect.ask_captcha_internal(captcha_sid)
 				end
-			end
+      end
+      @connect.last_user_post = Time.new
 			@connect = connect_old
+      return_value
 		end
 		
 		def mail(message, title = "",connector=nil)
 			connect = forсe_login(connector,@connect)
+
+      if(connect.last_user_mail)
+				    diff = Time.new - connect.last_user_mail
+				    sleep(@@mail_interval - diff) if(diff<@@mail_interval)
+			end
 			log "Mailing ..."
 			chas = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0][0]
 			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
@@ -768,7 +904,7 @@ module Vkontakte
 
 			captcha_sid = nil
 			captcha_key = nil
-            while true
+      while true
 				hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
 				unless(captcha_key.nil?)
 					hash["captcha_sid"] = captcha_sid
@@ -782,7 +918,8 @@ module Vkontakte
 					captcha_sid = a[a.length-2]
 					captcha_key = connect.ask_captcha_internal(captcha_sid)
 				end
-			end
+      end
+      connect.last_user_mail = Time.new
 		end
 		
 		def wall(size = 50)
@@ -835,6 +972,10 @@ module Vkontakte
 		def invite(message=nil,connector=nil)
 			connect_old = @connect
 			@connect = forсe_login(connector,@connect)
+      if(@connect.last_user_invite)
+				    diff = Time.new - @connect.last_user_invite
+				    sleep(@@invite_interval - diff) if(diff<@@invite_interval)
+			end
 			log "Inviting ..."
 
 			fh = friend_hash
@@ -863,7 +1004,7 @@ module Vkontakte
 
 			@connect.post('/al_friends.php', {"act" => "request_text", "al" => "1", "mid" => id,"hash" => fh, "message" => message}) if message
 			
-			
+			@connect.last_user_invite = Time.new
 			@connect = connect_old
 		end
 		
@@ -876,21 +1017,25 @@ module Vkontakte
 			@connect = connect_old
 		end
 		
-		def User.all(query = '', size = 50, hash = {}, connector=nil)
+		def User.all(query = '', size = 50, offset = 0, hash = {}, connector=nil)
 			log "Searching users ..."
 		    res_all = []
-			index = 0
+			index = offset
 			while true do
 				res = User.all_offset(query,index,hash,connector)
-				index += res.length
+        index += 20 if index==0
+        index += 20
+
 				break if res.length == 0 || res_all.length>=size.to_i
 				res_all += res
 			end
-			return res_all
+      res_all = res_all[0,size] if(res_all.length>size)
+
+      return res_all
 		end
 		
-		def User.one(query = '', hash = {}, connector=nil)
-			User.all_offset(query,0,hash,connector)[0]
+		def User.one(query = '', offset = 0, hash = {}, connector=nil)
+			User.all_offset(query,offset,hash,connector)[0]
 		end
 		
 		
@@ -898,7 +1043,7 @@ module Vkontakte
 			connect = forсe_login(connector)
 			return [] unless connect.login
 			
-			qhash = {'al' => '1', 'c[name]' => '0', 'c[q]' => query, 'c[section]' => 'people', 'offset' => offset.to_s}
+			qhash = {'al' => '1', 'c[q]' => query, 'c[section]' => 'people', 'offset' => offset.to_s}
 			country_name = hash["Страна"]
 			country = @@countries[country_name]
 			
@@ -912,9 +1057,19 @@ module Vkontakte
 			
 			qhash["c[sex]"] = "2" if(hash["Пол"] == "Мужской")
 			qhash["c[sex]"] = "1" if(hash["Пол"] == "Женский")
-			
+
+      age_from = hash["От"]
+      qhash["c[age_from]"] = age_from if age_from
+
+      age_to = hash["До"]
+      qhash["c[age_to]"] = age_to if age_to
+
 			qhash["c[online]"] = "1" if(hash["Онлайн"] == "Да")
-			
+
+
+      qhash["c[name]"] = (hash["По имени"] == "Да")?"1":"0"
+      qhash["c[sort]"] = "1" if (hash["По дате"] == "Да")
+
 			
 			res = connect.post('/al_search.php',qhash)
 			html_text = res.split("<!>").find{|x| x.index '<div'}
@@ -923,8 +1078,10 @@ module Vkontakte
 			res = []
 			html.xpath("//div[@class='info fl_l']").each do |human|
 				a = human.xpath(".//a")[0]
-				
-				res.push(User.new.set(a["href"].gsub("/id","").gsub("/",""),a.text,connect))
+				href = a["href"]
+        href = href.scan(/\/id(\d+)/)[0][0] if href =~ /\/id\d+/
+        href.gsub!("/","")
+				res.push(User.new.set(href,a.text,connect))
 			
 			end
 			res
@@ -932,7 +1089,12 @@ module Vkontakte
 			
 		end
 		
-		
+		def firstname
+      name.split(/\s+/).first
+    end
+
+
+
 		def User.parse(href)
 			if href.index("/id")
 				id = href.split("/id")[1] 
@@ -1163,7 +1325,12 @@ module Vkontakte
 		
 		def remove
 			return false unless @connect.login
-			return unless delete_hash
+
+      resp = @connect.get("/al_photos.php?__query=album#{user.id}_#{id}&act=edit&al=-1&al_id=155366142")
+      if(resp && resp.index("albumhash"))
+         delete_hash =  resp.scan(/albumhash\s*\:\s*\'([^\']+)\'/)[0][0]
+      end
+      return unless delete_hash
 			log "Removing album..."
 			@connect.post('/al_photos.php',{"act" => "delete_album", "al" => "1", "album" => "#{user.id}_#{id}", "hash" => delete_hash})
 		end
@@ -1187,7 +1354,7 @@ module Vkontakte
 			id_complex_split = id_complex.split("_")
 			connect = forсe_login(nil,nil)
 			resp = connect.post('/al_photos.php', {"act" => "show","al" => "1","photo" => id_complex})
-			json = JSON.parse(resp.split("<!>").find{|x| x.index('"id"')}.gsub("<!json>",""))[0]
+			json = JSON.parse(resp.split("<!>").find{|x| x.index('"id"')}.gsub("<!json>","")).find{|x| x["id"] == id_complex}
 			Image.new.set(Album.parse("/" + resp.split("<!>").find{|x| x.index("album")}),id_complex_split.last,json["x_src"],json["hash"],connect)
 		end
 		
@@ -1281,15 +1448,59 @@ module Vkontakte
 			
 			return false unless connect.login
 			return false unless hash_current
-       if(@connect.last_user_like)
+       if(connect.last_user_like)
 				    diff = Time.new - @connect.last_user_like
 				    sleep(@@like_interval - diff) if(diff<@@like_interval)
 			  end
 			log "Like photo ..."
-			res_post = connect.post("/like.php",{"act" => "a_do_like", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
-      @connect.last_user_like = Time.new
+			connect.post("/like.php",{"act" => "a_do_like", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
+      connect.last_user_like = Time.new
 		end
-		
+
+    def post(message,connector=nil)
+
+      connect = forсe_login(connector,@connect)
+			if(connector)
+				hash_current = hash_vk_for_user(connector)
+			else
+				hash_current = hash_vk
+			end
+
+			return false unless connect.login
+			return false unless hash_current
+
+
+      captcha_sid = nil
+			captcha_key = nil
+
+      if(connect.last_user_post)
+				  diff = Time.new - @connect.last_user_post
+				  sleep(@@post_interval - diff) if(diff<@@post_interval)
+      end
+      log "Post to photo ..."
+
+      while true
+				hash = {"act" => "post_comment", "al" => "1","fromview"=>"1","hash"=>hash_current,"comment"=>message,"photo" => "#{album.user.id}_#{id}"}
+				unless(captcha_key.nil?)
+					hash["captcha_sid"] = captcha_sid
+					hash["captcha_key"] = captcha_key
+				end
+				res = connect.post("/al_photos.php",hash)
+				if(res.index("<div"))
+           break;
+
+				else
+					a = res.split("<!>")
+					captcha_sid = a[a.length-2]
+          break if captcha_sid.to_i < 100
+					captcha_key = @connect.ask_captcha_internal(captcha_sid)
+				end
+      end
+
+      connect.last_user_post = Time.new
+    end
+
+
 		def unlike(connector=nil)
 			connect = forсe_login(connector,@connect)
 			if(connector)
@@ -1301,13 +1512,13 @@ module Vkontakte
 			
 			return false unless connect.login
 			return false unless hash_current
-       if(@connect.last_user_like)
+       if(connect.last_user_like)
 				    diff = Time.new - @connect.last_user_like
 				    sleep(@@like_interval - diff) if(diff<@@like_interval)
 			  end
 			log "Unlike photo ..."
-			res_post = connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
-      @connect.last_user_like = Time.new
+			connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
+      connect.last_user_like = Time.new
 		end
 		
 		
