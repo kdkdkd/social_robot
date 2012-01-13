@@ -393,14 +393,16 @@ module Vkontakte
 			html.xpath("//table").to_a.each do |table|
 				dur = table.xpath(".//div[@class='duration fl_r']")
 				if(dur.length>0)
+
 					res.push(Music.new.set(
-						table.xpath(".//input[@type='hidden']/@id").text.scan(/audio_info(\d+\_\d+)/)[0][0],
+						table.xpath(".//input[@type='hidden']/@id").text.scan(/audio_info[^\d]*(\d+\_\d+)/)[0][0],
 						table.xpath(".//div[@class='audio_title_wrap']//span").find{|span| (!span["id"].nil?) && span["id"].start_with?("title")}.text,
 						table.xpath(".//div[@class='audio_title_wrap']//a").first.text,
 						table.xpath(".//input[@type='hidden']/@value").text.split(",")[0],
 						dur.text,
 						connect
 					))
+
 				end
 			end
 			res
