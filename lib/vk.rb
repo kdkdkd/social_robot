@@ -1200,6 +1200,7 @@ module Vkontakte
 		
 		
 		def Album.parse(href)
+		    href = href.split("?").first
 			id_complex = href.split("/album").last.split("_")
 			user = User.id(id_complex.first)
 			user.albums.find{|x| x.id == id_complex.last}
