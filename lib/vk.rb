@@ -299,8 +299,28 @@ module Vkontakte
 		def login
 			return true if @cookie_login
 			log "Logging in..."
+
+      #check captcha
+        login_hash = {'op'=>'a_login_attempt','login' => @login}
+        captcha_sid = nil
+        captcha_key = nil
+        while true
+            login_hash["captcha_sid"] = captcha_sid if captcha_sid
+            login_hash["captcha_key"] = captcha_key if captcha_key
+            a_login_attempt = @agent.post(addr('/login.php'),login_hash)
+            login_attempt_captcha = a_login_attempt.body.scan(/\"captcha\_sid\"\:\"([^\"]+)\"/)[0]
+            if(login_attempt_captcha)
+                 captcha_sid = login_attempt_captcha[0]
+                 captcha_key = ask_captcha_internal(captcha_sid)
+            else
+                 break
+            end
+
+        end
+
+
 			@agent.get(addr("/")) do |login_page|
-				login_result = login_page.form_with(:name => 'login') do |login|
+        login_result = login_page.form_with(:name => 'login') do |login|
 					login.pass = @password
 					login.email = @login
 				 end.submit
