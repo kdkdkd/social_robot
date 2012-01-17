@@ -1,3 +1,8 @@
+#pretty string is used to display different object in nice format
+#array extension is used to make constructions like this me.friends.friends.print. This code will output nice formatted html
+
+
+
 class Array
   def download(*params)
 		self.inject([]){|a,x| a.push(x.download(*params)) if x.respond_to?('download');a}.uniq
@@ -54,8 +59,8 @@ class Array
 		res = ""
 		b = "["
 		b.print_indentation = print_indentation
-		res << b.pretty_string << "\n"
-		self.each_with_index{|xm,i| x = xm.to_s.dup;x.print_indentation = print_indentation + 1; res << x.pretty_string;  res << "," if i < length - 1  ;res<<"\n"}
+		res << b.pretty_string << "<br/>"
+		self.each_with_index{|xm,i| x = xm;print_indentation_xm = x.print_indentation;x.print_indentation = print_indentation + 1; res << x.pretty_string;  res << "," if i < length - 1  ;res<<"<br/>";x.print_indentation = print_indentation_xm}
 		
 		b = "]"
 		b.print_indentation = print_indentation
@@ -65,35 +70,72 @@ class Array
 end
 
 class Hash
+    
 	def pretty_string
 		res = ""
 		b = "{"
 		b.print_indentation = print_indentation
-		res << b.pretty_string << "\n"
+		res << b.pretty_string << "<br/>"
 		i = 0
-		self.each do |xm,ym| 
-			x = xm.to_s.dup;y = ym.to_s.dup
+		self.each do |xm,ym|
+            x = xm
+			y = ym
+			print_indentation_xm = x.print_indentation
+			print_indentation_ym = y.print_indentation
+			
 			y.print_indentation = 0;
-			x.print_indentation = print_indentation + 1
+			
 			
 			add = ""
 			if y.class.name == "Array" || y.class.name == "Hash"
 				y.print_indentation = print_indentation + 1
-				add = "\n"
+				add = "<br/>"
 			end
 			y_str = add + y.pretty_string
 			
+			x.print_indentation = print_indentation + 1
 			
 			res << x.pretty_string << " => " << y_str
 			res << "," if i < length - 1
-			res<<"\n"
+			res<<"<br/>"
 			i+=1
+			x.print_indentation = print_indentation_xm
+			y.print_indentation = print_indentation_ym
+			
+			
 		end
 		
 		b = "}"
 		b.print_indentation = print_indentation
 		res << b.pretty_string
 	end
+end
+
+
+module Vkontakte
+	class User
+		def pretty_string
+			res = "<img src = 'images/user.png'/>#{@name.to_s + ((@name)? " (" : "") + "<a href='#{Vkontakte::vkontakte_location}/#{ ((@id.to_s =~ /^\d+$/)? "id":"") + @id}'>#{@id}</a>" + ((@name)? ")" : "") }"
+			res.print_indentation = print_indentation
+			res.pretty_string
+	    end
+	end
+	class Image
+		def pretty_string
+			res = "<img src = 'images/photo.png'/>#{album.name.to_s + " (<a href='#{link}'>#{@id}</a>)"}"
+			res.print_indentation = print_indentation
+			res.pretty_string
+	    end
+	end
+	
+	class Album
+		def pretty_string
+			res = "<img src = 'images/album.png'/>#{name.to_s + " (<a href='#{Vkontakte::vkontakte_location}/album#{user.id}_#{id}'>#{@id}</a>)"}"
+			res.print_indentation = print_indentation
+			res.pretty_string
+	    end
+	end
+	
 end
 
 
@@ -105,7 +147,7 @@ class Object
 	end
 
 	def pretty_string
-		(" " * (4 * print_indentation)) + self.to_s
+		("&nbsp;" * (4 * print_indentation)) + self.to_s
 	end
 	
 	def print_indentation=(value)

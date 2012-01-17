@@ -18,6 +18,12 @@ Vkontakte::application_directory = File.expand_path("../..")
 $mutex = Mutex.new
 $app = Qt::Application.new(ARGV)
 
+#Output message from system to console or log window
+def log(*args, &block)
+	@@log_block = block if block
+	@@log_block.call(*args) if defined?(@@log_block)
+end
+	
 
 class SocialRobot < Qt::MainWindow
 	slots    'link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
@@ -507,16 +513,18 @@ class SocialRobot < Qt::MainWindow
 	#On run script clicked
 	def run_script
 		return if @thread && @thread.alive?
-		$mutex.synchronize {
+		#$mutex.synchronize {
 		    @log_edit.clear()
-			
 		    @log_edit.html = "<font color='black' size='3' >Запуск...</font>"
-		}
+		#}
 		s = @code_edit.plainText
 		s.force_encoding("UTF-8")
 		@thread = Thread.new(s,self) do |script,robot|
 			begin
 				log do |text|
+					robot.log_ok text
+				end
+				progress do |text|
 					robot.log_ok text
 				end
 				ask_captcha	do |pict|
