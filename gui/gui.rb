@@ -380,7 +380,7 @@ class SocialRobot < Qt::MainWindow
 		text = text.to_s
 		text.force_encoding("UTF-8")
 		$mutex.synchronize {
-			@new_lines << ("<font color='red'>" + text + "</font>")
+			@new_lines << ("<font color='red' size='3'>" + text + "</font>")
 		}
 	end
 
@@ -389,7 +389,7 @@ class SocialRobot < Qt::MainWindow
 		text = text.to_s
 		text.force_encoding("UTF-8")
 		$mutex.synchronize {
-			@new_lines << ("<font color='green'>" + text + "</font>")
+			@new_lines << ("<font color='green' size='3'>" + text + "</font>")
 		}
 	end
 
@@ -399,7 +399,7 @@ class SocialRobot < Qt::MainWindow
 		text.force_encoding("UTF-8")
 		$mutex.synchronize {
 			
-			@new_lines << text
+			@new_lines << "<font color='black' size='3'>" + text + "</font>"
 		}
 	end
 
@@ -408,7 +408,7 @@ class SocialRobot < Qt::MainWindow
 		text = text.to_s
 		text.force_encoding("UTF-8")
 		$mutex.synchronize {
-			@new_lines << ("<font color='grey'><small>" + text + "</small></font>")
+			@new_lines << ("<font color='grey' size='3'>" + text + "</font>")
 		}
 	end
 
@@ -507,8 +507,11 @@ class SocialRobot < Qt::MainWindow
 	#On run script clicked
 	def run_script
 		return if @thread && @thread.alive?
-		@log_edit.html = "Запуск..."
-		
+		$mutex.synchronize {
+		    @log_edit.clear()
+			
+		    @log_edit.html = "<font color='black' size='3' >Запуск...</font>"
+		}
 		s = @code_edit.plainText
 		s.force_encoding("UTF-8")
 		@thread = Thread.new(s,self) do |script,robot|
