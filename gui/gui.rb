@@ -610,14 +610,14 @@ class SocialRobot < Qt::MainWindow
 				eval(script)
 				@progress_text.text = "Выполнено"
         @progress_text.setStyleSheet("QLabel { color : green; }");
-        @progress = [0,100]
+        @progress.setValue(0)
 				@disable_run_gui = true
 			rescue Exception => e  
 				robot.log_error e.message 
 				e.backtrace.each{|l|robot.log_small l} 
         @progress_text.text = "Ошибка"
         @progress_text.setStyleSheet("QLabel { color : red; }");
-				@progress = [0,100]
+				@progress.setValue(0)
         @disable_run_gui = true
 			end
 		end
