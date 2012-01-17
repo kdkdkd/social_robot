@@ -8,10 +8,7 @@ number = ask_res[1]
 music = Music.all(name)[0..number-1]
 
 #Вывести сообщение
-"Будут скачаны :".print
+"Ссылки на песни :".print
 
 #Вывод песен, которые будут закачаны
 music.print
-
-#Качаем музыку
-music.download

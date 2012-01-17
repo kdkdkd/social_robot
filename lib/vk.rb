@@ -9,12 +9,13 @@ module Vkontakte
     @@countries
   end
 
-	#Output message from system
-	def log(*args, &block)
-		@@log_block = block if block
-		@@log_block.call args[0] if args.length>0 && @@log_block
-  end
-
+	
+	#Output message about what system has done
+	def progress(*args, &block)
+		@@progress_block = block if block
+		@@progress_block.call(*args) if defined?(@@progress_block) && args.length>0
+    end
+	
 
   @@user_fetch_interval = 2.1
 	def user_fetch_interval=(value)
@@ -196,7 +197,7 @@ module Vkontakte
 		def save(url,folder,filename)
 			path = File.join(Vkontakte::loot_directory,folder)
 			Dir::mkdir(path) unless File.exists?(path) && File.directory?(path)
-			log "Downloading " + url
+			progress "Downloading " + url
 			filename = filename.gsub(/[\\\/\:\"\*\?\<\>\|]+/,'').gsub("\s","_")
 			ext = File.extname(filename)
 			basename = filename.chomp(ext)
@@ -298,7 +299,7 @@ module Vkontakte
 		#login with given login and password
 		def login
 			return true if @cookie_login
-			log "Logging in..."
+			progress "Logging in..."
 
       #check captcha
         login_hash = {'op'=>'a_login_attempt','login' => @login}
@@ -336,16 +337,16 @@ module Vkontakte
 					id = check_login
 					if(id)
 						save_cookie
-						log "Done"
+						progress "Done"
 						@uid = id
 						return id
 					else
 						#need phone prove
-						log "Failed"
+						progress "Failed"
 						return false
 					end
 				 else
-					log "Failed"
+					progress "Failed"
 					return false
 				 end
 			end
@@ -397,6 +398,7 @@ module Vkontakte
 		def download
 			return false unless @connect.login
 			res = @connect.save(@link,"music","#{@author}_#{@name}_#{id}.mp3")
+      progress :music_downloaded,res,self
       res
 		end
 		
@@ -454,8 +456,8 @@ module Vkontakte
 				f = File.new(filename, "rb")
 				params["file"] = f
 				addr = a[0][1].gsub("\"",'').gsub("'",'')
-				log "Uploading " + filename
-				
+				progress "Uploading " + filename
+
 				#Uploading music
 				res = JSON.parse(connect.post(addr,params))
 				f.close
@@ -470,6 +472,7 @@ module Vkontakte
 				#Finishing action
 				music_res = connect.post('/audio',res).scan(/\[[^\]]*\]/).find{|x| x.index("vkontakte.ru")}
 				res_internal = Music.new.set_array(JSON.parse(music_res),connect)
+        progress :music_uploaded,res_internal
 				if many
 					res_total.push(res_internal)
 				else
@@ -482,8 +485,9 @@ module Vkontakte
     def remove
       return false unless @connect.login
       return false unless delete_hash
-      log "Deleting music..."
+      progress "Deleting music..."
       @connect.post('/audio',{'act' => 'delete_audio', 'aid' => id ,'al' => '1', 'hash' => delete_hash, 'oid' => @user_id, 'restore' => '1'})
+      progress :music_removed,@name
     end
 		
 	end
@@ -540,7 +544,7 @@ module Vkontakte
 		
 		def info(connector=nil)
 			connect = forсe_login(connector,@connect)
-			log "Fetching info..."
+			progress "Fetching info..."
 
 			resp = connect.get_group(@id)
       begin
@@ -596,7 +600,7 @@ module Vkontakte
 			old_connect = @connect
 			@connect = forсe_login(connector,@connect)
 			return unless group_hash
-			log "Entering group ..."
+			progress "Entering group ..."
 			connect.post('/al_groups.php',{"act" => "enter", "al" => "1", "gid" => id , "hash" => group_hash})
 			@connect = old_connect
 			
@@ -606,7 +610,7 @@ module Vkontakte
 			old_connect = @connect
 			@connect = forсe_login(connector,@connect)
 			return unless group_hash
-			log "Leaving group ..."
+			progress "Leaving group ..."
 				connect.post('/al_groups.php',{"act" => "enter", "context" => "_decline" ,"al" => "1", "gid" => id , "hash" => group_hash})
 			  connect.post('/al_groups.php',{"act" => "leave", "al" => "1", "gid" => id , "hash" => group_hash})
       @connect = old_connect
@@ -620,7 +624,7 @@ module Vkontakte
 				    diff = Time.new - @connect.last_user_invite
 				    sleep(@@invite_interval - diff) if(diff<@@invite_interval)
 			end
-			log "Inviting to group ..."
+			progress "Inviting to group ..."
 			
 			invite_box = @connect.post('/al_page.php', {'act' => 'a_invite_box', 'al' => '1', 'gid' => id})
 			
@@ -777,11 +781,11 @@ module Vkontakte
 			return false unless @connect.login
 			
 			if(@me)
-				log "List of my friends..."	
+				progress "List of my friends..."	
 				friends_json = JSON.parse(@connect.post('/al_friends.php', {"act" => "pv_friends","al" => "1"}).gsub(/^.*\<\!json\>/,''))
 				friends_json.map{|x,y| User.new.set(x.gsub('_',''),y[1],@connect)}
 			else
-				log "List of friends..."
+				progress "List of friends #{@id}..."
 				@connect.silent_post('/al_friends.php', {"act" => "load_friends_silent","al" => "1","id"=>@id,"gid"=>"0"}).map{|x| User.new.set(x[0],x[4],@connect)}
 			end
 		end
@@ -789,7 +793,7 @@ module Vkontakte
 		def info
 			return @info if @info
 			return {} unless @connect.login
-			log "Fetching info ..."
+			progress "Fetching info #{@id} ..."
 			
 			resp = @connect.get_user(@id.to_s)
       if resp.nil?
@@ -829,7 +833,7 @@ module Vkontakte
 		
 		def music
 			return false unless @connect.login
-			log "List of music..."
+			progress "List of music#{@id}..."
 			q = {"act" => "load_audios_silent","al" => "1"}
 			q["id"]=id unless @me
 
@@ -840,7 +844,7 @@ module Vkontakte
 		
 		def albums
 			return false unless @connect.login
-			log "List of albums ..."
+			progress "List of albums #{@id} ..."
 			offset = 0
 			total_res = []
 			
@@ -882,7 +886,7 @@ module Vkontakte
 				    sleep(@@post_interval - diff) if(diff<@@post_interval)
 			end
 
-			log "Posting ..."
+			progress "Posting #{@id}..."
 			captcha_sid = nil
 			captcha_key = nil
 			@post_hash = nil
@@ -919,7 +923,7 @@ module Vkontakte
 				    diff = Time.new - connect.last_user_mail
 				    sleep(@@mail_interval - diff) if(diff<@@mail_interval)
 			end
-			log "Mailing ..."
+			progress "Mailing #{@id}..."
 			chas = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0][0]
 			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
 			chas.reverse!
@@ -946,7 +950,7 @@ module Vkontakte
 		
 		def wall(size = 50)
 			return false unless @connect.login
-     		log "Reading wall ..."
+     		progress "Reading wall #{@id}..."
 			return wall_offset(size) if size == "all"
 		    res_all = []
 			index = 0
@@ -998,7 +1002,7 @@ module Vkontakte
 				    diff = Time.new - @connect.last_user_invite
 				    sleep(@@invite_interval - diff) if(diff<@@invite_interval)
 			end
-			log "Inviting ..."
+			progress "Inviting #{@id}..."
 
 			fh = friend_hash
 			
@@ -1034,13 +1038,13 @@ module Vkontakte
 		def uninvite(connector=nil)
 			connect_old = @connect
 			@connect = forсe_login(connector,@connect)
-			log "Uninviting ..."
+			progress "Uninviting #{@id}..."
 			@connect.post('/al_friends.php', {"act" => "remove", "al" => "1", "mid" => id, "hash" => friend_hash})
 			@connect = connect_old
 		end
 		
 		def User.all(query = '', size = 50, offset = 0, hash = {}, connector=nil)
-			log "Searching users ..."
+			progress "Searching users #{query}..."
 		    res_all = []
 			index = offset
 			while true do
@@ -1129,9 +1133,11 @@ module Vkontakte
 		
 		def groups
 			return false unless @connect.login
-			log "List of groups..."
+			progress "List of groups #{@id}..."
 			res = []
-			JSON.parse(@connect.post('/al_groups.php', {"act" => "get_list", "al" => "1", "mid" => id, "tab" => "groups"}).split("<!>").find{|x| x.index("<!json>")}.gsub("<!json>","")).each do |el|
+      json_text = @connect.post('/al_groups.php', {"act" => "get_list", "al" => "1", "mid" => id, "tab" => "groups"}).split("<!>").find{|x| x.index("<!json>")}
+      return [] if json_text.nil?
+			JSON.parse(json_text.gsub("<!json>","")).each do |el|
 				 res.push Group.new.set(el[2].to_s,el[0],@connect)
 			end
 			res.uniq!
@@ -1190,7 +1196,7 @@ module Vkontakte
 			connect = forсe_login(connector,@connect)
 			return false unless connect.login
 			return false unless like_hash
-			log "Like post ..."
+			progress "Like post ..."
 			res_post = connect.post("/like.php",{"act" => "a_do_like", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user.id}_#{id}","wall"=>"1"})
 		end
 		
@@ -1198,14 +1204,14 @@ module Vkontakte
 			connect = forсe_login(connector,@connect)
 			return false unless connect.login
 			return false unless like_hash
-			log "Unlike post ..."
+			progress "Unlike post ..."
 			res_post = connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user.id}_#{id}","wall"=>"1"})
 		end
 		
 		def remove
 			return false unless @connect.login
 			return false unless delete_hash
-			log "Delete post ..."
+			progress "Delete post ..."
 			res_post = @connect.post("/al_wall.php",{"act" => "delete", "al" => "1","from"=>"wall","hash"=>delete_hash,"post"=>"#{user.id}_#{id}","root"=>"0"})
 		end
 
@@ -1259,7 +1265,7 @@ module Vkontakte
 		def Album.create(name, description="", connector=nil)
 			connect = forсe_login(connector)
 			
-			log "Creating album ..."
+			progress "Creating album ..."
 			hash = connect.post('/al_photos.php',{"al" => "1", "act" => "new_album_box"}).scan(/hash\:\s*\'([^\']+)\'/)[0][0]
 			res = connect.post('/al_photos.php',{"al" => "1", "act" => "new_album", "comm" => "0", "view" => "0", "only" => "false" , "oid" => connect.uid, "title" => name, "desc" => description, "hash" => hash })
 			album_id = res.scan(/\_(\d+)/)[0][0]
@@ -1283,7 +1289,7 @@ module Vkontakte
 			
 			filenames.each do |filename|
 				
-				log "Uploading #{filename} ..."  
+				progress "Uploading #{filename} ..."  
 				#Asking for upload parameters and server
 				post = connect.post('/al_photos.php',{"__query" => "album#{user.id}_#{id}", "al" => "-1", "al_id" => user.id})
 				hash = post.scan(/hash[^\da-z]+([\da-z]+)/)[0][0]
@@ -1321,7 +1327,7 @@ module Vkontakte
 		
 		def photos
 			return false unless @connect.login
-			log "List of photos ..."
+			progress "List of photos ..."
 			
 			res = []
 			num = 0
@@ -1354,7 +1360,7 @@ module Vkontakte
          delete_hash =  resp.scan(/albumhash\s*\:\s*\'([^\']+)\'/)[0][0]
       end
       return unless delete_hash
-			log "Removing album..."
+			progress "Removing album..."
 			@connect.post('/al_photos.php',{"act" => "delete_album", "al" => "1", "album" => "#{user.id}_#{id}", "hash" => delete_hash})
 		end
 		
@@ -1414,7 +1420,7 @@ module Vkontakte
 		
 		def remove
 			return false unless @connect.login
-			log "Deleting photo ..."
+			progress "Deleting photo ..."
 			@connect.post("/al_photos.php",{"act" => "delete_photo", "al" => "1", "hash" => hash_vk, "photo" => "#{album.user.id}_#{id}"})
 		end
 		
@@ -1434,7 +1440,7 @@ module Vkontakte
 				    diff = Time.new - @connect.last_user_mark_photo
 				    sleep(@@photo_mark_interval - diff) if(diff<@@photo_mark_interval)
 			  end
-				log "Marking ..."
+				progress "Marking ..."
 				@connect.post('/al_photos.php', {"act" => "add_tag", "al" => "1", "hash" => hash_vk, "mid" => user_it.id, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
         @connect.last_user_mark_photo = Time.new
 			end
@@ -1453,7 +1459,7 @@ module Vkontakte
 				users_array = [users]
             end
 			users_array.each do |user_it|
-				log "Unmarking ..."
+				progress "Unmarking ..."
 				next if tagged.class.name == "Array"
 				tag = tagged[user_it.id]
 				next unless tag
@@ -1475,7 +1481,7 @@ module Vkontakte
 				    diff = Time.new - @connect.last_user_like
 				    sleep(@@like_interval - diff) if(diff<@@like_interval)
 			  end
-			log "Like photo ..."
+			progress "Like photo ..."
 			connect.post("/like.php",{"act" => "a_do_like", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
       connect.last_user_like = Time.new
 		end
@@ -1500,7 +1506,7 @@ module Vkontakte
 				  diff = Time.new - @connect.last_user_post
 				  sleep(@@post_interval - diff) if(diff<@@post_interval)
       end
-      log "Post to photo ..."
+      progress "Post to photo ..."
 
       while true
 				hash = {"act" => "post_comment", "al" => "1","fromview"=>"1","hash"=>hash_current,"comment"=>message,"photo" => "#{album.user.id}_#{id}"}
@@ -1539,7 +1545,7 @@ module Vkontakte
 				    diff = Time.new - @connect.last_user_like
 				    sleep(@@like_interval - diff) if(diff<@@like_interval)
 			  end
-			log "Unlike photo ..."
+			progress "Unlike photo ..."
 			connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
       connect.last_user_like = Time.new
 		end
