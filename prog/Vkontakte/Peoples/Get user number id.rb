@@ -4,5 +4,11 @@ user = User.parse(ask_string("Адрес страницы"))
 #Получить его id 
 id = user.id
 
-#Вывести id если не пустой
-id.print unless id.nil?
+
+if id.nil?
+    #Если id пустой
+    "Пользователь не найден".print
+else
+    #Вывести id и пользователя
+    {id => user}.print
+end
