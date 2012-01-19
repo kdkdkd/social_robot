@@ -232,6 +232,18 @@ module Vkontakte
 	    end
 	end
 	
+	
+	class Post
+		def pretty_string
+		    text_output = text
+			text_output = (text.length>20) ? text[0..17] + "..." : text
+			
+			res = "<img src = 'images/post.png'/> #{text_output}"
+			res.print_indentation = print_indentation
+			res.pretty_string
+	    end
+	end
+	
 end
 
 

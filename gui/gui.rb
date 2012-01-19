@@ -305,7 +305,7 @@ class SocialRobot < Qt::MainWindow
 		Qt::Object.connect(@timer, SIGNAL("timeout()"), invoke, SLOT("invoke()"))
 		@timer.start
 
-		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Вконтакте -> Музыка -> Cкачать мою музыку</i><br/><br/>Создавать свои программы можно нажав кнопку <img src=\"images/developer.png\"/> в меню.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net/vkontakte\">http://socialrobot.net</a>")
+		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Создавать свои программы можно нажав кнопку <img src=\"images/developer.png\"/> в меню.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a>")
 		
 		update_developer_mode()
 
