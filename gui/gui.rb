@@ -221,7 +221,7 @@ class SocialRobot < Qt::MainWindow
 		@fileMenu.addAction(@open_settings_action)
 		@fileMenu.addAction(@exit_action)
 		
-		generate_menu(menuBar(),'../prog')
+		generate_menu(menuBar(),'../prog/Vkontakte')
 		generate_menu(menuBar().addMenu("Мои скрипты"),'../../my')
 		
 		
@@ -559,6 +559,7 @@ class SocialRobot < Qt::MainWindow
 		@stop_action.setEnabled(!enable)
 		@run_action.setEnabled(enable)
     @progress.visible = !enable
+    @progress.setValue(1)
 	end
 
 	#On run script clicked
@@ -636,6 +637,9 @@ class SocialRobot < Qt::MainWindow
 		@res_proxy = []
 		@ask_proxy = params
 		while(true) do
+      if(@res_proxy.length == 1 && @res_proxy[0].nil?)
+        raise "Отменено пользователем"
+      end
 			if(@res_proxy.length >0)
 				res = @res_proxy
 				@res_proxy = []
@@ -842,7 +846,12 @@ class SocialRobot < Qt::MainWindow
 		layout.VerticalSpacing = 30
 		ask.windowTitle = "Введите значения"
 		ask.setLayout(layout)
-		ask.exec
+		res_exec = ask.exec
+
+    if res_exec == 0
+        @timer.start
+        return [nil]
+    end
 		res = []
 		controls.each do |control|
 

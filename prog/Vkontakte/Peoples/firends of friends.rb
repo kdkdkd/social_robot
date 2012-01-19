@@ -7,6 +7,9 @@ my_friends.each_with_index do |user,i|
      #Вывести список его друзей
      user.friends.print
 
+     #Спим
+     sleep 3
+
      #Обновить прогресс бар
      total(i,my_friends.length)
 end

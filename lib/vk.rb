@@ -913,6 +913,8 @@ module Vkontakte
       end
       @connect.last_user_post = Time.new
 			@connect = connect_old
+      progress :user_post,self,return_value if return_value
+
       return_value
 		end
 		
@@ -945,6 +947,8 @@ module Vkontakte
 					captcha_key = connect.ask_captcha_internal(captcha_sid)
 				end
       end
+      progress :user_mail,self,message
+
       connect.last_user_mail = Time.new
 		end
 		
@@ -962,9 +966,7 @@ module Vkontakte
 			end
 			return res_all
 		end
-		
-		
-		
+
 		def wall_offset(offset = 0)
 			if offset=="all"
 				res_all = []
@@ -993,8 +995,7 @@ module Vkontakte
 			res
 
 		end
-		
-		
+
 		def invite(message=nil,connector=nil)
 			connect_old = @connect
 			@connect = forсe_login(connector,@connect)
@@ -1029,7 +1030,8 @@ module Vkontakte
 			@connect.post('/al_friends.php', {"act" => "friend_tt", "al" => "1", "mid" => id})
 
 			@connect.post('/al_friends.php', {"act" => "request_text", "al" => "1", "mid" => id,"hash" => fh, "message" => message}) if message
-			
+
+      progress :user_invite,self
 			@connect.last_user_invite = Time.new
 			@connect = connect_old
 		end
@@ -1041,6 +1043,7 @@ module Vkontakte
 			progress "Uninviting #{@id}..."
 			@connect.post('/al_friends.php', {"act" => "remove", "al" => "1", "mid" => id, "hash" => friend_hash})
 			@connect = connect_old
+      progress :user_uninvite,self
 		end
 		
 		def User.all(query = '', size = 50, offset = 0, hash = {}, connector=nil)
