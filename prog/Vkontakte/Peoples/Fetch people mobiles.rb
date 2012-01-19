@@ -1,9 +1,8 @@
-#Результат
-res = {}
-
+#Находим людей
+peoples = ask_peoples
 
 #Для каждого человека
-ask_peoples.each do |user| 
+peoples.each_with_index do |user,i| 
 
     #Получить информацию о человеке
     phone = user.info["Моб. телефон"]
@@ -15,9 +14,9 @@ ask_peoples.each do |user|
     phone.gsub!(/[^\d]/,"")
 
     #Запомнить телефон, если в нем содержится достаточно букв
-    res[user.id] = phone if(phone.length>=10)
-
+    {phone => user}.print if(phone.length>=10)
+    
+    #Update progress bar
+    total(i,peoples.length)
 end
 
-#Вывести телефон
-res.print

@@ -12,10 +12,8 @@ friend = list.one(name)
 music = friend.music
 
 #Вывести сообщение
-"Музыка, которая будет скачана :".print
+"Ссылки на музыку".print
+friend.print
 
 #Вывести список музыки
 music.print
-
-#Качаем музыку
-music.download

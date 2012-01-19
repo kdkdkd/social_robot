@@ -2,12 +2,13 @@
 
 require 'Qt'
 require '../lib/vk.rb'
-require '../lib/sugar_vk.rb'
+require './sugar_vk.rb'
 require './highlighter_ruby.rb'
 require 'pathname'
 require './help.rb'
 require './settings.rb'
 require './updater.rb'
+require './logger_html.rb'
 require 'zip/zipfilesystem'
 include Vkontakte
 
@@ -15,13 +16,22 @@ include Vkontakte
 Vkontakte::application_directory = File.expand_path("../..")
 
 
-$mutex = Mutex.new
+$mutex_log_edit = Mutex.new
+$mutex_progress_text = Mutex.new
+$mutex_progress = Mutex.new
 $app = Qt::Application.new(ARGV)
 
 #Output message from system to console or log window
 def log(*args, &block)
 	@@log_block = block if block
 	@@log_block.call(*args) if defined?(@@log_block)
+end
+
+
+#Show total on progress bar
+def show_progress(*args, &block)
+	@@log_total = block if block
+	@@log_total.call(*args) if defined?(@@log_total) && args.length>1
 end
 	
 
@@ -45,6 +55,16 @@ class SocialRobot < Qt::MainWindow
 		@log_edit = Qt::TextBrowser.new
 		@log_edit.openExternalLinks = false
 		@log_edit.openLinks = false
+
+
+    @progress = Qt::ProgressBar.new
+    @progress_text = Qt::Label.new
+    @progress_text.text = ""
+
+    statusBar().insertPermanentWidget(0,@progress_text,0)
+    statusBar().insertPermanentWidget(1,@progress,0)
+
+
 		connect(@log_edit,SIGNAL('anchorClicked( const QUrl & )'),self,SLOT('link_clicked( const QUrl & )'))
 		@help_tree = Qt::TreeWidget.new
     @log_edit.setStyleSheet("QTextBrowser{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
@@ -201,7 +221,7 @@ class SocialRobot < Qt::MainWindow
 		@fileMenu.addAction(@open_settings_action)
 		@fileMenu.addAction(@exit_action)
 		
-		generate_menu(menuBar(),'../prog')
+		generate_menu(menuBar(),'../prog/Vkontakte')
 		generate_menu(menuBar().addMenu("Мои скрипты"),'../../my')
 		
 		
@@ -223,6 +243,12 @@ class SocialRobot < Qt::MainWindow
 		#Lines to add to log
 		@new_lines = []
 
+    #Status text to display
+		@new_progress_text = nil
+
+    #Percent of progress to display
+		@new_progress = nil
+
 		#Working thread
 		@thread = nil
 
@@ -241,10 +267,26 @@ class SocialRobot < Qt::MainWindow
 
 		#On iddle 
 		block = Proc.new do
-			$mutex.synchronize {
+			$mutex_log_edit.synchronize {
 				@new_lines.each {|line| @log_edit.append(line)}
 				@new_lines = []
 			}
+
+      $mutex_progress_text.synchronize{
+        if @new_progress_text
+           @progress_text.text = @new_progress_text
+           @new_progress_text = nil
+        end
+      }
+
+      $mutex_progress.synchronize{
+        if @new_progress
+           @progress.setRange(1,@new_progress[1])
+           @progress.setValue(@new_progress[0])
+           @new_progress = nil
+        end
+      }
+
 			if(@disable_run_gui)
 				run_gui(true)
 				@disable_run_gui = false
@@ -263,7 +305,7 @@ class SocialRobot < Qt::MainWindow
 		Qt::Object.connect(@timer, SIGNAL("timeout()"), invoke, SLOT("invoke()"))
 		@timer.start
 
-		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Вконтакте -> Музыка -> Cкачать мою музыку</i><br/><br/>Создавать свои программы можно нажав кнопку <img src=\"images/developer.png\"/> в меню.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net/vkontakte\">http://socialrobot.net</a>")
+		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Создавать свои программы можно нажав кнопку <img src=\"images/developer.png\"/> в меню.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a>")
 		
 		update_developer_mode()
 
@@ -385,7 +427,7 @@ class SocialRobot < Qt::MainWindow
 	def log_error(text)
 		text = text.to_s
 		text.force_encoding("UTF-8")
-		$mutex.synchronize {
+		$mutex_log_edit.synchronize {
 			@new_lines << ("<font color='red' size='3'>" + text + "</font>")
 		}
 	end
@@ -394,7 +436,7 @@ class SocialRobot < Qt::MainWindow
 	def log_success(text)
 		text = text.to_s
 		text.force_encoding("UTF-8")
-		$mutex.synchronize {
+		$mutex_log_edit.synchronize {
 			@new_lines << ("<font color='green' size='3'>" + text + "</font>")
 		}
 	end
@@ -403,17 +445,24 @@ class SocialRobot < Qt::MainWindow
 	def log_ok(text)
 		text = text.to_s
 		text.force_encoding("UTF-8")
-		$mutex.synchronize {
+		$mutex_log_edit.synchronize {
 			
 			@new_lines << "<font color='black' size='3'>" + text + "</font>"
 		}
-	end
+  end
+
+  #show total on gui progress bar
+  def total(value,range)
+    $mutex_progress.synchronize {
+			@new_progress = [value,range]
+		}
+  end
 
 	#Log with small grey font
 	def log_small(text)
 		text = text.to_s
 		text.force_encoding("UTF-8")
-		$mutex.synchronize {
+		$mutex_log_edit.synchronize {
 			@new_lines << ("<font color='grey' size='3'>" + text + "</font>")
 		}
 	end
@@ -423,7 +472,7 @@ class SocialRobot < Qt::MainWindow
 		return true if !@changed || @code_edit.plainText.length == 0
 		msgBox = Qt::MessageBox.new
 		msgBox.setText("Скрипт не сохранен.")
-		msgBox.setInformativeText("Все равно продолжить?")
+    msgBox.setInformativeText("Все равно продолжить?")
 		msgBox.setStandardButtons(Qt::MessageBox::Ok | Qt::MessageBox::Cancel)
 		msgBox.setDefaultButton(Qt::MessageBox::Cancel)
 		res = msgBox.exec() == Qt::MessageBox::Ok
@@ -501,22 +550,26 @@ class SocialRobot < Qt::MainWindow
 	def stop_script
 		@thread.kill if @thread
 		run_gui(true)
-		log_error("Остановлено")
+		@progress_text.text = "Остановлено"
+    @progress_text.setStyleSheet("QLabel { color : red; }");
 	end
 
 	#Toggle start/stop buttons
 	def run_gui(enable)
 		@stop_action.setEnabled(!enable)
 		@run_action.setEnabled(enable)
+    @progress.visible = !enable
+    @progress.setValue(1)
 	end
 
 	#On run script clicked
 	def run_script
 		return if @thread && @thread.alive?
-		#$mutex.synchronize {
-		    @log_edit.clear()
-		    @log_edit.html = "<font color='black' size='3' >Запуск...</font>"
-		#}
+
+    @log_edit.clear()
+    @progress_text.setStyleSheet("QLabel { color : black; }");
+		@progress_text.text = "Запуск..."
+
 		s = @code_edit.plainText
 		s.force_encoding("UTF-8")
 		@thread = Thread.new(s,self) do |script,robot|
@@ -524,8 +577,18 @@ class SocialRobot < Qt::MainWindow
 				log do |text|
 					robot.log_ok text
 				end
-				progress do |text|
-					robot.log_ok text
+				progress do |*args|
+          if(args.length==1)
+            text = args[0]
+            $mutex_progress_text.synchronize {
+      			   @new_progress_text = text
+		        }
+          else
+             robot.log_ok log_html(*args)
+          end
+        end
+        show_progress do |value,range|
+					robot.total(value,range)
 				end
 				ask_captcha	do |pict|
 					ask({"type" => "Image", "Path" => pict} => "string")[0]
@@ -546,12 +609,17 @@ class SocialRobot < Qt::MainWindow
         Vkontakte.invite_interval = Settings["invite_interval"].to_f
 
 				eval(script)
-				robot.log_success "Выполнено"
+				@progress_text.text = "Выполнено"
+        @progress_text.setStyleSheet("QLabel { color : green; }");
+        @progress.setValue(0)
 				@disable_run_gui = true
 			rescue Exception => e  
 				robot.log_error e.message 
 				e.backtrace.each{|l|robot.log_small l} 
-				@disable_run_gui = true
+        @progress_text.text = "Ошибка"
+        @progress_text.setStyleSheet("QLabel { color : red; }");
+				@progress.setValue(0)
+        @disable_run_gui = true
 			end
 		end
 		run_gui(false)
@@ -569,6 +637,9 @@ class SocialRobot < Qt::MainWindow
 		@res_proxy = []
 		@ask_proxy = params
 		while(true) do
+      if(@res_proxy.length == 1 && @res_proxy[0].nil?)
+        raise "Отменено пользователем"
+      end
 			if(@res_proxy.length >0)
 				res = @res_proxy
 				@res_proxy = []
@@ -775,7 +846,12 @@ class SocialRobot < Qt::MainWindow
 		layout.VerticalSpacing = 30
 		ask.windowTitle = "Введите значения"
 		ask.setLayout(layout)
-		ask.exec
+		res_exec = ask.exec
+
+    if res_exec == 0
+        @timer.start
+        return [nil]
+    end
 		res = []
 		controls.each do |control|
 
