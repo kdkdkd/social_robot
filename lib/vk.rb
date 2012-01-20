@@ -1,6 +1,8 @@
 ﻿require 'mechanize'
 require 'nokogiri'
 require 'json'
+require 'net/http'
+require 'uri'
 
 module Vkontakte
 
@@ -220,7 +222,14 @@ module Vkontakte
 			basename = filename.chomp(ext)
 			basename = basename[0..99] + "..." if basename.length>100
 			res = File.join(path,basename + ext)
-			@agent.get(url).save(res)
+			#@agent.get(url).save(res)
+			uri = URI(url)
+			Net::HTTP.start(uri.host) do |http|
+				resp = http.get(uri.path)
+				File.open(res, "wb") do |file|
+					file.write(resp.body)
+				end
+			end
 			res
 		end
 		
