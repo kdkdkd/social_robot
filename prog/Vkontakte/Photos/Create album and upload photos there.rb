@@ -2,8 +2,21 @@
 res = ask("Название альбома" => "string", "Описание альбома" => "string", "Фотографии" => "files")
 name = res[0]
 description = res[1]
-photos = res[2]
+photos_list = res[2]
 
 #Создать альбом и загрузить туда фото
-Album.create(name, description).upload(photos,"")
+new_album = Album.create(name, description)
+
+#Для каждого фото
+photos_list.each_with_index do |photo,i|
+
+    #Загрузить фото
+    new_album.upload(photo,"")
+
+
+   #Обновить прогресс бар
+   total(i,photos_list.length)
+
+end
+
 

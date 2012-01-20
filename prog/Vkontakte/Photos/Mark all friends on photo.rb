@@ -1,6 +1,9 @@
+#Получаем список друзей
+friends = me.friends
+
 #Групируем друзей по 35
 grouped_friends = []
-me.friends.each_with_index do |friend,index| 
+friends.each_with_index do |friend,index| 
     grouped_friends[index/35] = [] unless grouped_friends[index/35]
     grouped_friends[index/35].push(friend) 
 end
@@ -13,14 +16,26 @@ result_file = result_ask[1]
 #Создаем альбом
 album = Album.create(result_album,"")
 
-#Для каждой группы
-grouped_friends.each_with_index do |friends_group,index|
+#Запоминаем сколько уже отмечено
+index = 0
 
-   
+#Для каждой группы друзей по 35
+grouped_friends.each do |friends_group|
 
     #Загружем фото
     photo = album.upload(result_file,"")
 
-    #Отмечаем всех людей на фото
-    photo.mark(friends_group)
+    #Для каждого друга в группе
+    friends_group.each do |friend|
+          
+          #Отмечаем на фото
+          photo.mark(friend)
+
+          #Увеличиваем счетчик
+          index +=1
+          
+          #Обновляем прогресс бар
+          total(index,friends.length)
+    end
+
 end

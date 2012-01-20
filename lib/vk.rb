@@ -10,6 +10,9 @@ module Vkontakte
 	end
 
 	#Output message about what system has done
+	#This function can be overloaded by client
+	#If has one argument - it holds the brief action, what system is doing
+	#If many - first is symbol which describes completed action, second more info. see logger_html
 	def progress(*args, &block)
 		@@progress_block = block if block
 		@@progress_block.call(*args) if defined?(@@progress_block) && args.length>0
@@ -131,6 +134,28 @@ module Vkontakte
 	end
 	
 	@@last_connect = nil
+
+	#Used to upload files with non latin file names
+	def safe_file_name(filename)
+		basename = File.basename(filename)
+		all_ascii = true
+		basename.each_byte do |c|
+			if c>=128
+				all_ascii = false
+				break
+			end
+		end
+
+
+		if(all_ascii)
+			yield(filename)
+		else
+			new_file_name = File.dirname(filename) + '/' + (0...8).map{ ('a'..'z').to_a[rand(26)] }.join + File.extname(filename)
+			FileUtils.cp(filename,new_file_name)
+			yield(new_file_name)
+			FileUtils.rm(new_file_name)
+		end
+	end
 	
 	class Connect
 		attr_reader :uid
@@ -435,14 +460,20 @@ module Vkontakte
 				a = connect.post('/audio',{"act" => "new_audio", "al" => "1", "gid" => "0"}).scan(/Upload\.init\(\s*([^\,]+)\s*\,\s*([^\,]+)\s*\,\s*(\{[^\}]*\})/)
 				params = JSON.parse(a[0][2])
 				params["ajx"] = "1"
-				f = File.new(filename, "rb")
-				params["file"] = f
+
+
 				addr = a[0][1].gsub("\"",'').gsub("'",'')
 				progress "Uploading " + filename
 
 				#Uploading music
-				res = JSON.parse(connect.post(addr,params))
-				f.close
+				res = nil
+				safe_file_name(filename) do |file_safe|
+					f = File.new(file_safe, "rb")
+					params["file"] = f
+					res = JSON.parse(connect.post(addr,params))
+					f.close
+				end
+
 				
 				res["act"] = "done_add"
 				res["al"] = "1"
@@ -1239,6 +1270,7 @@ module Vkontakte
 			album_id = res.scan(/\_(\d+)/)[0][0]
 			res_album = Album.new.set(User.new.set(connect.uid), album_id ,name,nil,connect)
 			progress :album_created, res_album
+			res_album
 		end
 		
 		
@@ -1265,13 +1297,15 @@ module Vkontakte
 				addr = post.scan(/flashLiteUrl\s*\=\s*([^\;]+)/)[0][0].gsub("\"",'').gsub("'",'').gsub("\\",'')
 				
 				params = {"oid" => user.id, "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "rhash" => rhash, "act" => "do_add", "ajx" => "1"}
-				f = File.new(filename, "rb")
-				params["photo"] = f
+				res = nil
+				safe_file_name(filename) do |file_safe|
+					f = File.new(file_safe, "rb")
+					params["photo"] = f
 				
-				#Uploading photo
-				res = connect.post(addr,params)
-				f.close
-				
+					#Uploading photo
+					res = connect.post(addr,params)
+					f.close
+				end
 				
 				#Asking for photo parameters
 				hash = res.scan(/hash\=([^\&]+)/)[0][0]
@@ -1415,10 +1449,10 @@ module Vkontakte
 				diff = Time.new - @connect.last_user_mark_photo
 				sleep(@@photo_mark_interval - diff) if(diff<@@photo_mark_interval)
 			end
-			progress "Marking #{user.to_s}..."
+			progress "Marking #{user_it.to_s}..."
 			@connect.post('/al_photos.php', {"act" => "add_tag", "al" => "1", "hash" => hash_vk, "mid" => user_it.id, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
 			@connect.last_user_mark_photo = Time.new
-			progress :image_marked,user
+			progress :image_marked,user_it
 			end
 		end
 		
@@ -1435,12 +1469,12 @@ module Vkontakte
 				users_array = [users]
 			end
 			users_array.each do |user_it|
-				progress "Unmarking #{user.to_s}..."
+				progress "Unmarking #{user_it.to_s}..."
 				next if tagged.class.name == "Array"
 				tag = tagged[user_it.id]
 				next unless tag
 				@connect.post('/al_photos.php', {"act" => "delete_tag", "al" => "1", "hash" => hash_vk, "tag" => tag, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
-				progress :image_unmarked,user
+				progress :image_unmarked,user_it
 			end
 		end
 		

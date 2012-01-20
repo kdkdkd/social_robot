@@ -235,9 +235,9 @@ module Vkontakte
 	
 	class Post
 		def pretty_string
-		    text_output = text
-			text_output = (text.length>20) ? text[0..17] + "..." : text
-			
+			text_output = (text.length>90) ? text[0..87] + "..." : text
+			text_output.gsub!(/\s+/," ")
+
 			res = "<img src = 'images/post.png'/> #{text_output}"
 			res.print_indentation = print_indentation
 			res.pretty_string
