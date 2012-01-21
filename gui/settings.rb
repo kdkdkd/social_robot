@@ -44,9 +44,12 @@
 end
 
 
-class SettingsWindow
-	def self.show
-		window = Qt::Dialog.new
+class SettingsWindow < Qt::Dialog
+  slots 'update_captcha_solver ( int )'
+  attr_accessor :antigate_key_label, :antigate_key_textbox
+
+  def self.show
+		window = SettingsWindow.new
 		layout = Qt::GridLayout.new  
 
 		use_anonymizer_label = Qt::Label.new
@@ -103,11 +106,41 @@ class SettingsWindow
 		invite_interval_ceckbox.value  = Settings["invite_interval"].to_f
 		layout.addWidget(invite_interval_ceckbox,6,1)
 		
-		exit_button = Qt::PushButton.new("Ок",window)
-		layout.addWidget(exit_button,7,1,Qt::AlignRight)
-		window.connect(exit_button,SIGNAL('clicked()'),window,SLOT('accept()'))	
-		
-		
+
+
+
+    captcha_solver_label = Qt::Label.new
+		captcha_solver_label.text = "Разгадывание капчи"
+		layout.addWidget(captcha_solver_label,7,0)
+		captcha_solver_combo = Qt::ComboBox.new
+
+		captcha_solver_combo.insertItem(0,"Вручную")
+    captcha_solver_combo.insertItem(1,"antigate.com")
+
+
+    window.antigate_key_label = Qt::Label.new
+		window.antigate_key_label.text = "Ключ api. Можно узнать тут:\n<a href='http://antigate.com/panel.php?action=showkey'>http://antigate.com/panel.php?action=showkey</a>"
+		layout.addWidget(window.antigate_key_label,8,0)
+		window.antigate_key_textbox = Qt::LineEdit.new
+		window.antigate_key_textbox.text  = Settings["antigate_key"].to_s
+		layout.addWidget(window.antigate_key_textbox,8,1)
+
+    connect(captcha_solver_combo,SIGNAL('currentIndexChanged ( int )'),window,SLOT('update_captcha_solver ( int )'))
+    if(Settings["captcha_solver"]=="1")
+      captcha_solver_combo.setCurrentIndex(1)
+      window.update_captcha_solver(1)
+    else
+      captcha_solver_combo.setCurrentIndex(0)
+      window.update_captcha_solver(0)
+    end
+		layout.addWidget(captcha_solver_combo,7,1)
+
+
+    exit_button = Qt::PushButton.new("Ок",window)
+		layout.addWidget(exit_button,9,1,Qt::AlignRight)
+		connect(exit_button,SIGNAL('clicked()'),window,SLOT('accept()'))
+
+
 		layout.setContentsMargins(50,50,50,50)
 		layout.HorizontalSpacing = 75
 		layout.VerticalSpacing = 30
@@ -121,9 +154,26 @@ class SettingsWindow
       Settings["mail_interval"] = mail_interval_ceckbox.value.to_s
       Settings["post_interval"] = post_interval_ceckbox.value.to_s
       Settings["invite_interval"] = invite_interval_ceckbox.value.to_s
+      Settings["captcha_solver"] = captcha_solver_combo.currentIndex.to_s
+      if(captcha_solver_combo.currentIndex == 0)
+         Settings["antigate_key"] = nil
+      else
+         Settings["antigate_key"] = window.antigate_key_textbox.text.to_s
+      end
 			Settings.save		
 		end
-	end
+  end
+
+  def update_captcha_solver ( index )
+    if(index == 1)
+      self.antigate_key_label.visible = true
+      self.antigate_key_textbox.visible = true
+    else
+      self.antigate_key_label.visible = false
+      self.antigate_key_textbox.visible = false
+    end
+
+  end
 
 		
 end

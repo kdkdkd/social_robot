@@ -202,7 +202,7 @@ module Vkontakte
 		end
 		
 		def ask_captcha_internal(captcha_sid)
-			file_name = save(addr("/captcha.php?sid=#{captcha_sid}&s=1"),"captcha","#{captcha_sid}.jpg")
+			file_name = save(addr("/captcha.php?sid=#{captcha_sid}&s=1"),"captcha","#{captcha_sid}.jpg",true)
 			file_name_png = file_name.gsub(".jpg",".png")
 			command = "\"#{Vkontakte::convert_exe}\" \"#{file_name}\" \"#{file_name_png}\""
 			system(command)
@@ -213,7 +213,7 @@ module Vkontakte
 		end
 
 		#Save some file to loot folder
-		def save(url,folder,filename)
+		def save(url,folder,filename,with_mechanize = false)
 			path = File.join(Vkontakte::loot_directory,folder)
 			Dir::mkdir(path) unless File.exists?(path) && File.directory?(path)
 			progress "Downloading " + url
@@ -222,12 +222,15 @@ module Vkontakte
 			basename = filename.chomp(ext)
 			basename = basename[0..99] + "..." if basename.length>100
 			res = File.join(path,basename + ext)
-			#@agent.get(url).save(res)
-			uri = URI(url)
-			Net::HTTP.start(uri.host) do |http|
-				resp = http.get(uri.path)
-				File.open(res, "wb") do |file|
-					file.write(resp.body)
+			if(with_mechanize)
+				@agent.get(url).save(res)
+			else
+				uri = URI(url)
+				Net::HTTP.start(uri.host) do |http|
+					resp = http.get(uri.path)
+					File.open(res, "wb") do |file|
+						file.write(resp.body)
+					end
 				end
 			end
 			res

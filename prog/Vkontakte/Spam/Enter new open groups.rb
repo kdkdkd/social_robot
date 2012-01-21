@@ -8,8 +8,7 @@ while true
 
      #Если группа открыта
      if group.open
-          #Вывести имя групы
-          "#{group.name} #{group.id}".print         
+          
           #Войти
           group.enter
           

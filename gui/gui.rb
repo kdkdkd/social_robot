@@ -2,6 +2,7 @@
 
 require 'Qt'
 require '../lib/vk.rb'
+require '../lib/captcha.rb'
 require './sugar_vk.rb'
 require './highlighter_ruby.rb'
 require 'pathname'
@@ -44,7 +45,7 @@ class SocialRobot < Qt::MainWindow
 		setWindowTitle("Социальный робот. " + IO.read("../version.txt"))
 		setWindowIcon(Qt::Icon.new("images/logo.png"))
 		#Create main widgets and dock interface 
-		resize(800, 600)
+		resize(600, 600)
 		log_dock = Qt::DockWidget.new("Лог", self)
 		@help_dock = Qt::DockWidget.new("Помощь", self)
 
@@ -591,7 +592,17 @@ class SocialRobot < Qt::MainWindow
 					robot.total(value,range)
 				end
 				ask_captcha	do |pict|
-					ask({"type" => "Image", "Path" => pict} => "string")[0]
+          if(Settings["captcha_solver"] == "0")
+					  res = ask({"type" => "Image", "Path" => pict} => "string")[0]
+          else
+            begin
+              progress "Sending captcha to antigate #{pict}..."
+              res = Antigate.solve(File.expand_path("../../loot/captcha/#{pict}.jpg"),Settings["antigate_key"])
+            rescue
+              res = ask({"type" => "Image", "Path" => pict} => "string")[0]
+            end
+          end
+          res
 				end
 				ask_login do
 					me
