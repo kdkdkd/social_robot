@@ -805,7 +805,7 @@ module Vkontakte
 				friends_json.map{|x,y| User.new.set(x.gsub('_',''),y[1],@connect)}
 			else
 				progress "List of friends #{@id}..."
-				@connect.silent_post('/al_friends.php', {"act" => "load_friends_silent","al" => "1","id"=>@id,"gid"=>"0"}).map{|x| User.new.set(x[0],x[4],@connect)}
+				@connect.silent_post('/al_friends.php', {"act" => "load_friends_silent","al" => "1","id"=>id,"gid"=>"0"}).map{|x| User.new.set(x[0],x[4],@connect)}
 			end
 		end
 		
