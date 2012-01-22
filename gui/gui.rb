@@ -20,6 +20,7 @@ Vkontakte::application_directory = File.expand_path("../..")
 $mutex_log_edit = Mutex.new
 $mutex_progress_text = Mutex.new
 $mutex_progress = Mutex.new
+$mutex_run_gui = Mutex.new
 $app = Qt::Application.new(ARGV)
 
 #Output message from system to console or log window
@@ -269,8 +270,16 @@ class SocialRobot < Qt::MainWindow
 		#On iddle 
 		block = Proc.new do
 			$mutex_log_edit.synchronize {
-				@new_lines.each {|line| @log_edit.append(line)}
-				@new_lines = []
+			  if(@new_lines)
+          if(@new_lines.length>0)
+
+            lines_to_add = @new_lines[0..20]
+            @new_lines = @new_lines[21..@new_lines.length-1]
+            lines_to_add.each {|line| @log_edit.append(line)}
+          end
+        else
+           @new_lines = []
+				end
 			}
 
       $mutex_progress_text.synchronize{
@@ -287,11 +296,12 @@ class SocialRobot < Qt::MainWindow
            @new_progress = nil
         end
       }
-
+$mutex_run_gui.synchronize{
 			if(@disable_run_gui)
 				run_gui(true)
 				@disable_run_gui = false
 			end
+			}
 			if @ask_proxy.length > 0
 				@res_proxy = ask_user_internal(@ask_proxy)
 				@ask_proxy = []
@@ -444,11 +454,20 @@ class SocialRobot < Qt::MainWindow
 
 	#Log with black color
 	def log_ok(text)
-		text = text.to_s
-		text.force_encoding("UTF-8")
+		#text = text.to_s
+		#text.force_encoding("UTF-8")
 		$mutex_log_edit.synchronize {
 			
-			@new_lines << "<font color='black' size='3'>" + text + "</font>"
+			if(text.class.name == "Array")
+				text_array = text
+			else
+				text = text.to_s
+				text.force_encoding("UTF-8")
+				text_array = [text]
+			end
+			text_array.each do |text_line|
+				@new_lines << "<font color='black' size='3'>" + text_line.to_s + "</font>"
+			end
 		}
   end
 
@@ -554,19 +573,32 @@ class SocialRobot < Qt::MainWindow
 		@progress_text.text = "Остановлено"
     @progress_text.setStyleSheet("QLabel { color : red; }");
 	end
+	
+	def set_disable_run_gui
+		$mutex_run_gui.synchronize {
+			@disable_run_gui = true
+		}
+	end
 
 	#Toggle start/stop buttons
 	def run_gui(enable)
 		@stop_action.setEnabled(!enable)
 		@run_action.setEnabled(enable)
-    @progress.visible = !enable
-    @progress.setValue(1)
+		@progress.visible = !enable
+		@progress.setValue(1)
 	end
-
+	
+	def progress_text(text)
+		$mutex_progress_text.synchronize {
+      	   @new_progress_text = text
+		}
+	end
 	#On run script clicked
 	def run_script
 		return if @thread && @thread.alive?
-
+    $mutex_log_edit.synchronize {
+        @new_lines = []
+    }
     @log_edit.clear()
     @progress_text.setStyleSheet("QLabel { color : black; }");
 		@progress_text.text = "Запуск..."
@@ -579,30 +611,28 @@ class SocialRobot < Qt::MainWindow
 					robot.log_ok text
 				end
 				progress do |*args|
-          if(args.length==1)
-            text = args[0]
-            $mutex_progress_text.synchronize {
-      			   @new_progress_text = text
-		        }
-          else
-             robot.log_ok log_html(*args)
-          end
-        end
-        show_progress do |value,range|
+					if(args.length==1)
+						text = args[0]
+						robot.progress_text(text)
+					else
+						robot.log_ok log_html(*args)
+					end
+				end
+				show_progress do |value,range|
 					robot.total(value,range)
 				end
 				ask_captcha	do |pict|
-          if(Settings["captcha_solver"] == "0")
-					  res = ask({"type" => "Image", "Path" => pict} => "string")[0]
-          else
-            begin
-              progress "Sending captcha to antigate #{pict}..."
-              res = Antigate.solve(File.expand_path("../../loot/captcha/#{pict}.jpg"),Settings["antigate_key"])
-            rescue
-              res = ask({"type" => "Image", "Path" => pict} => "string")[0]
-            end
-          end
-          res
+					if(Settings["captcha_solver"] == "0")
+						res = ask({"type" => "Image", "Path" => pict} => "string")[0]
+					else
+						begin
+							progress "Sending captcha to antigate #{pict}..."
+							res = Antigate.solve(File.expand_path("../../loot/captcha/#{pict}.jpg"),Settings["antigate_key"])
+						rescue
+							res = ask({"type" => "Image", "Path" => pict} => "string")[0]
+						end
+					end
+					res
 				end
 				ask_login do
 					me
@@ -611,26 +641,26 @@ class SocialRobot < Qt::MainWindow
 					use_anonymizer
 				else
 					force_location
-        end
-        Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
-        Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
-        Vkontakte.like_interval = Settings["like_interval"].to_f
-        Vkontakte.mail_interval = Settings["mail_interval"].to_f
-        Vkontakte.post_interval = Settings["post_interval"].to_f
-        Vkontakte.invite_interval = Settings["invite_interval"].to_f
+				end
+				Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
+				Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
+				Vkontakte.like_interval = Settings["like_interval"].to_f
+				Vkontakte.mail_interval = Settings["mail_interval"].to_f
+				Vkontakte.post_interval = Settings["post_interval"].to_f
+				Vkontakte.invite_interval = Settings["invite_interval"].to_f
 
 				eval(script)
-				@progress_text.text = "Выполнено"
-        @progress_text.setStyleSheet("QLabel { color : green; }");
-        @progress.setValue(0)
-				@disable_run_gui = true
+				progress "Выполнено"
+				#@progress_text.setStyleSheet("QLabel { color : green; }");
+				#@progress.setValue(0)
+				robot.set_disable_run_gui
 			rescue Exception => e  
 				robot.log_error e.message 
 				e.backtrace.each{|l|robot.log_small l} 
-        @progress_text.text = "Ошибка"
-        @progress_text.setStyleSheet("QLabel { color : red; }");
-				@progress.setValue(0)
-        @disable_run_gui = true
+				progress "Ошибка"
+				#@progress_text.setStyleSheet("QLabel { color : red; }");
+				#		@progress.setValue(0)
+				robot.set_disable_run_gui
 			end
 		end
 		run_gui(false)

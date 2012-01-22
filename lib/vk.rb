@@ -222,6 +222,7 @@ module Vkontakte
 			basename = filename.chomp(ext)
 			basename = basename[0..99] + "..." if basename.length>100
 			res = File.join(path,basename + ext)
+			return res if File.exist?(res)
 			if(with_mechanize)
 				@agent.get(url).save(res)
 			else

@@ -126,11 +126,11 @@ class Array
 		self.find(){|x| x.to_s.index(search)}
 	end
 	def pretty_string
-		res = ""
+		res = []
 		b = "["
 		b.print_indentation = print_indentation
-		res << b.pretty_string << "<br/>"
-		self.each_with_index{|xm,i| x = xm;print_indentation_xm = x.print_indentation;x.print_indentation = print_indentation + 1; res << x.pretty_string;  res << "," if i < length - 1  ;res<<"<br/>";x.print_indentation = print_indentation_xm}
+		res << b.pretty_string
+		self.each_with_index{|xm,i| x = xm;print_indentation_xm = x.print_indentation;x.print_indentation = print_indentation + 1; res << x.pretty_string;  x.print_indentation = print_indentation_xm}
 		
 		b = "]"
 		b.print_indentation = print_indentation
@@ -142,10 +142,10 @@ end
 class Hash
     
 	def pretty_string
-		res = ""
+		res = []
 		b = "{"
 		b.print_indentation = print_indentation
-		res << b.pretty_string << "<br/>"
+		res << b.pretty_string
 		i = 0
 		self.each do |xm,ym|
       begin
@@ -165,18 +165,21 @@ class Hash
 			y.print_indentation = 0;
 			
 			
-			add = ""
+			add = false
 			if y.class.name == "Array" || y.class.name == "Hash"
 				y.print_indentation = print_indentation + 1
-				add = "<br/>"
+				add = true
 			end
-			y_str = add + y.pretty_string
+			y_str = y.pretty_string
 			
 			x.print_indentation = print_indentation + 1
-			
-			res << x.pretty_string << " => " << y_str
-			res << "," if i < length - 1
-			res<<"<br/>"
+
+      all_str =  x.pretty_string + " => "
+      all_str += y_str unless(add)
+			res << all_str
+      res << y_str if add
+			#res << "," if i < length - 1
+			#res<<"<br/>"
 			i+=1
 			x.print_indentation = print_indentation_xm
 			y.print_indentation = print_indentation_ym
