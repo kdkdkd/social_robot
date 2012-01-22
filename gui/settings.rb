@@ -119,7 +119,7 @@ class SettingsWindow < Qt::Dialog
 
 
     window.antigate_key_label = Qt::Label.new
-		window.antigate_key_label.text = "Ключ api. Можно узнать тут:\n<a href='http://antigate.com/panel.php?action=showkey'>http://antigate.com/panel.php?action=showkey</a>"
+		window.antigate_key_label.text = "Ключ api. Можно узнать тут:\nhttp://antigate.com/panel.php?action=showkey"
 		layout.addWidget(window.antigate_key_label,8,0)
 		window.antigate_key_textbox = Qt::LineEdit.new
 		window.antigate_key_textbox.text  = Settings["antigate_key"].to_s

@@ -653,14 +653,15 @@ module Vkontakte
 			
 			invite_box.scan(/page\.inviteToGroup\(([^\)]*)\)/).each do |arg|
 				args = arg[0].split(",").map{|x|x.strip}
-				correct_args = args.find{|x| x = user.id}
+				correct_args = args.find{|x| x.gsub("'",'').gsub("\"",'') == user.id}
 				if(correct_args)
 					hash = args.last.gsub("'",'')
 					@connect.post('/al_page.php', {'act' => 'a_invite', 'al' => '1', 'gid' => id, "hash" => hash, "mid" => user.id}).scan("page.inviteToGroup\(([^\)]*)\)")
+					@connect.last_user_invite = Time.new
+					progress :group_invite,self,user
+					break
 				end
 			end
-			@connect.last_user_invite = Time.new
-			progress :group_invite,self,user
 			@connect = old_connect
 		end
 	
@@ -740,7 +741,7 @@ module Vkontakte
 		def set(id,name=nil,connect=nil)
 			@id = id.to_s
 			@name = name
-			@connect = (connect)? connect:Vkontakte::last_connect;
+			@connect = (connect)? connect:Vkontakte::last_connect
 			@me = false
 			self
 		end
@@ -896,6 +897,7 @@ module Vkontakte
 		def post(msg,connector=nil)
 			connect_old = @connect
 			@connect = forсe_login(connector,@connect)
+
 			if(@connect.last_user_post)
 				diff = Time.new - @connect.last_user_post
 				sleep(@@post_interval - diff) if(diff<@@post_interval)
@@ -905,6 +907,8 @@ module Vkontakte
 			captcha_sid = nil
 			captcha_key = nil
 			@post_hash = nil
+			@info = nil
+			return nil unless post_hash
 			while true
 				hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id, "type" => "all" }
 				unless(captcha_key.nil?)
@@ -1059,17 +1063,19 @@ module Vkontakte
 		def User.all(query = '', size = 50, offset = 0, hash = {}, connector=nil)
 			progress "Searching users #{query}..."
 			res_all = []
-			index = offset
-			while true do
-				res = User.all_offset(query,index,hash,connector)
-				index += 20 if index==0
-				index += 20
+			5.times do
+				index = offset
+				while true do
+					res = User.all_offset(query,index,hash,connector)
+					index += 20 if index==0
+					index += 20
 
-				break if res.length == 0 || res_all.length>=size.to_i
-				res_all += res
+					break if res.length == 0 || res_all.length>=size.to_i
+					res_all += res
+				end
+				res_all = res_all[0,size] if(res_all.length>size)
+				return res_all if(res_all.length>0)
 			end
-			res_all = res_all[0,size] if(res_all.length>size)
-
 			return res_all
 		end
 		
@@ -1328,7 +1334,7 @@ module Vkontakte
 				params = {"photos" => photos,"server" => server,"from" => "html5","context" => "1", "al" => "1", "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "act" => "done_add"}
 				res = connect.post('/al_photos.php',params)
 				hash = res.scan(/deletePhoto[^\,]+\,\s*([^\)]+)/)[0][0].gsub("\"",'').gsub("'",'')
-				res_internal = Image.new.set(self,res.split("<!>").last.split("_").last,res.scan(/x_src\:\s*([^\,]+)/)[0][0].gsub("\"","").gsub("'",""),hash,connect)
+				res_internal = Image.new.set(self,res.split("<!>").last.split("_").last,res.scan(/x_src\:\s*([^\,]+)/)[0][0].gsub("\"","").gsub("'",""),hash,true,connect)
 				if many
 					res_total.push(res_internal)
 				else
@@ -1358,7 +1364,7 @@ module Vkontakte
 						b = true
 						break
 					end
-					array.push(Image.new.set(self,id,el['x_src'],el['hash'],connect))
+					array.push(Image.new.set(self,id,el['x_src'],el['hash'],!(el["actions"]["comm"].nil?),connect))
 					array
 				end
 				break if b
@@ -1385,24 +1391,27 @@ module Vkontakte
 	end
 	
 	class Image
-		attr_accessor :id, :album, :connect, :link, :hash_vk 
-		def set(album,id,link,hash_vk,connect)
+		attr_accessor :id, :album, :connect, :link, :hash_vk, :open
+		def set(album,id,link,hash_vk,open,connect)
 			@id = id
 			@album = album
 			@connect = connect
 			@link = link
+			@open = open
 			@hash_vk = hash_vk
 			self
 		end
 		
 		
 		def Image.parse(href)
+			href = href.split("?").first
 			id_complex = href.split("/photo").last
 			id_complex_split = id_complex.split("_")
 			connect = forсe_login(nil,nil)
 			resp = connect.post('/al_photos.php', {"act" => "show","al" => "1","photo" => id_complex})
 			json = JSON.parse(resp.split("<!>").find{|x| x.index('"id"')}.gsub("<!json>","")).find{|x| x["id"] == id_complex}
-			Image.new.set(Album.parse("/" + resp.split("<!>").find{|x| x.index("album")}),id_complex_split.last,json["x_src"],json["hash"],connect)
+			album_response = Album.parse("/" + resp.split("<!>").find{|x| x.index("album")})
+			Image.new.set(album_response,id_complex_split.last,json["x_src"],json["hash"],!(json["actions"]["comm"].nil?),connect)
 		end
 		
 		def hash_vk_for_user(connector)

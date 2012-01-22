@@ -201,7 +201,7 @@ module Vkontakte
 	end
 	class Image
 		def pretty_string
-			res = "<img src = 'images/photo.png'/>#{album.name.to_s + " (<a href='#{link}'>#{@id}</a>)"}"
+			res = "<img src = 'images/photo.png'/>#{album.name.to_s + " (<a href='#{Vkontakte::vkontakte_location}/photo#{album.user.id}_#{id}'>#{@id}</a>)"}"
 			res.print_indentation = print_indentation
 			res.pretty_string
 	    end

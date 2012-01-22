@@ -3,10 +3,11 @@ result_ask = ask("Тема" => "string" , "Сообщение.\n$Имя буде
 title = result_ask[0]
 message = result_ask[1]
 
-
+#Найти людей
+peoples = ask_peoples
 
 #Для каждого друга
-ask_peoples.each do |people|
+peoples.each_with_index do |people,index|
    
    #Копируем сообщение
    message_actual = message.dup   
@@ -25,6 +26,9 @@ ask_peoples.each do |people|
    #Заменяем полное имя
    title_actual.gsub!("$ИмяФамилия",people.name)
    
-
+   #Отослать сообщение
    people.mail(message_actual,title_actual)
+
+   #Обновить прогресс бар
+   total(index,peoples.length)
 end

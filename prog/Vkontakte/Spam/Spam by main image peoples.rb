@@ -1,7 +1,10 @@
 message = ask_text("Сообщение.\n$Имя будет заменено на имя пользователя.\n$ИмяФамилия на полное имя.")
 
+#Искать людей
+peoples = ask_peoples
+
 #Найти людей
-ask_peoples.each do |people| 
+peoples.each_with_index do |people,index| 
 	
      #Найти первый альбом
      avatar = people.avatar
@@ -15,10 +18,10 @@ ask_peoples.each do |people|
      #Заменяем полное имя
      message_actual.gsub!("$ИмяФамилия",people.name)   
 
-     #Вывести человека
-     people.print
-
      #Комментируем фотографию
-     avatar.post(message_actual) if avatar
+     avatar.post(message_actual) if (avatar && avatar.open)
+
+     #Обновляем прогресс бар
+     total(index,peoples.length)
 
 end

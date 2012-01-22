@@ -3,10 +3,11 @@ result_ask = ask("Тема" => "string" , "Сообщение.\n$Имя буде
 title = result_ask[0]
 message = result_ask[1]
 
-
+#Получить список друзей
+friends = me.friends
 
 #Для каждого друга
-me.friends.each do |friend|
+friends.each_with_index do |friend,index|
    
    #Копируем сообщение
    message_actual = message.dup   
@@ -27,4 +28,7 @@ me.friends.each do |friend|
    
    #Шлем сообщение другу
    friend.mail(message_actual,title_actual)
+
+   #Обновляем прогресс бар
+   total(index,friends.length)
 end
