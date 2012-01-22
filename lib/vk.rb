@@ -946,7 +946,9 @@ module Vkontakte
 				sleep(@@mail_interval - diff) if(diff<@@mail_interval)
 			end
 			progress "Mailing #{@id}..."
-			chas = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0][0]
+			post_decodehash = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0]
+			return unless post_decodehash
+			chas = post_decodehash[0]
 			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
 			chas.reverse!
 
