@@ -38,7 +38,7 @@ end
 	
 
 class SocialRobot < Qt::MainWindow
-	slots    'link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
+	slots    'enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
 
 	#Create gui and set timer
 	def initialize()
@@ -204,6 +204,12 @@ class SocialRobot < Qt::MainWindow
 		@developer_mode_action.statusTip = "Режим разработчика"
 		connect(@developer_mode_action, SIGNAL('triggered()'), self, SLOT('toggle_developer_mode()'))
 
+		@enter_action = Qt::Action.new(Qt::Icon.new("images/vkontakte.png"),"Вход в систему", self)
+		@enter_action.statusTip = "Вход в систему"
+		connect(@enter_action, SIGNAL('triggered()'), self, SLOT('enter_system()'))
+
+		
+		
 		
 		@exit_action = Qt::Action.new("Выход", self)
 	    @exit_action.shortcut = Qt::KeySequence.new("Ctrl+Q")
@@ -220,6 +226,7 @@ class SocialRobot < Qt::MainWindow
 		@fileMenu.addAction(@stop_action)
     @fileMenu.addAction(@loot_action)
 	  @fileMenu.addAction(@kill_session_action)
+	  @fileMenu.addAction(@developer_mode_action)
 		@fileMenu.addAction(@open_settings_action)
 		@fileMenu.addAction(@exit_action)
 		
@@ -235,7 +242,7 @@ class SocialRobot < Qt::MainWindow
 		@run_toolbar = addToolBar("Run")
 		@run_toolbar.addAction(@run_action)
 		@run_toolbar.addAction(@stop_action)
-		@run_toolbar.addAction(@developer_mode_action)
+		@run_toolbar.addAction(@enter_action)
 
 
 		statusBar().showMessage("")
@@ -316,7 +323,7 @@ $mutex_run_gui.synchronize{
 		Qt::Object.connect(@timer, SIGNAL("timeout()"), invoke, SLOT("invoke()"))
 		@timer.start
 
-		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Создавать свои программы можно нажав кнопку <img src=\"images/developer.png\"/> в меню.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a>")
+		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Или нажмите на кнопку <img src=\"images/vkontakte.png\"/> Это покажет Вас и Ваших друзей и абсолютно безобидно.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a>")
 		
 		update_developer_mode()
 
@@ -405,7 +412,15 @@ $mutex_run_gui.synchronize{
 	def menu_script_click
 		return unless check_changes
 		str = sender.data.toString
-		str.force_encoding("UTF-8")
+		run_script_by_name(str)
+	end
+	
+	def enter_system
+	    run_script_by_name("../prog/Vkontakte/Peoples/Me and my friends.rb")
+	end
+	
+	
+	def run_script_by_name(str)
 		text = IO.read(str)
 		text.force_encoding("UTF-8")
 		@code_edit.plainText = text
