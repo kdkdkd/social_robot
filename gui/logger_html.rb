@@ -32,6 +32,9 @@
 	 when :image_like then res = "Поставлен лайк к #{args[1].pretty_string}"
 	 when :image_post then res = "Оставлен комментарий к фото #{args[1].pretty_string}"
 	 when :image_unlike then res = "Убран лайк к #{args[1].pretty_string}"
+	 
+	 
+	 when :exception_user_mail then res = "Ошибка во время отправки почты: #{args[1].message}"
    end
    res.to_s
 end

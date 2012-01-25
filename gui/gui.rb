@@ -645,13 +645,13 @@ $mutex_run_gui.synchronize{
 							begin
 								progress "Sending captcha to antigate #{pict}..."
 								res = Antigate.solve(File.expand_path("../../loot/captcha/#{pict}.jpg"),Settings["antigate_key"])
-              rescue Exception => e
-                case e.message
-                  when "ERROR_NO_SLOT_AVAILABLE" then res = nil; sleep 5
-				  when "ERROR_CAPTCHA_UNSOLVABLE" then res = "asdas"
-				  when "ERROR_BAD_DUPLICATES" then res = "asdas"
-                  else  res = ask({"type" => "Image", "Path" => pict} => "string")[0]
-                end
+								rescue Exception => e
+								case e.message
+									when "ERROR_NO_SLOT_AVAILABLE" then res = nil; sleep 5
+									when "ERROR_CAPTCHA_UNSOLVABLE" then res = "asdas"
+									when "ERROR_BAD_DUPLICATES" then res = "asdas"
+									else raise "Проблема с сервисом antigate.com : #{e.message}"
+								end
 							end
 						end
 					end

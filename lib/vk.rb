@@ -939,39 +939,44 @@ module Vkontakte
 		end
 		
 		def mail(message, title = "",connector=nil)
-			connect = forсe_login(connector,@connect)
+			begin
+				connect = forсe_login(connector,@connect)
 
-			if(connect.last_user_mail)
-				diff = Time.new - connect.last_user_mail
-				sleep(@@mail_interval - diff) if(diff<@@mail_interval)
-			end
-			progress "Mailing #{@id}..."
-      post_decodehash = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0]
-      return unless post_decodehash
-			chas = post_decodehash[0]
-			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
-			chas.reverse!
+				if(connect.last_user_mail)
+					diff = Time.new - connect.last_user_mail
+					sleep(@@mail_interval - diff) if(diff<@@mail_interval)
+				end
+				progress "Mailing #{@id}..."
+				post_decodehash = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0]
+				return unless post_decodehash
+				chas = post_decodehash[0]
+				chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
+				chas.reverse!
 
-			captcha_sid = nil
-			captcha_key = nil
-			while true
-				hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
-				unless(captcha_key.nil?)
-					hash["captcha_sid"] = captcha_sid
-					hash["captcha_key"] = captcha_key
+				captcha_sid = nil
+				captcha_key = nil
+				while true
+					hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
+					unless(captcha_key.nil?)
+						hash["captcha_sid"] = captcha_sid
+						hash["captcha_key"] = captcha_key
+					end
+					res = connect.post('/al_mail.php', hash)
+					if(res.index("<div"))
+						break
+					else
+						a = res.split("<!>")
+						captcha_sid = a[a.length-2]
+						captcha_key = connect.ask_captcha_internal(captcha_sid)
+					end
 				end
-				res = connect.post('/al_mail.php', hash)
-				if(res.index("<div"))
-					break
-				else
-					a = res.split("<!>")
-					captcha_sid = a[a.length-2]
-					captcha_key = connect.ask_captcha_internal(captcha_sid)
-				end
+				progress :user_mail,self,message
+				connect.last_user_mail = Time.new
+			rescue Exception => e
+				progress :exception_user_mail,e
 			end
-			progress :user_mail,self,message
-			connect.last_user_mail = Time.new
 		end
+		
 		
 		def wall(size = 50)
 			return false unless @connect.login
