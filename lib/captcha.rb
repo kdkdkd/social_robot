@@ -1,6 +1,16 @@
 require 'mechanize'
 class Antigate
+	@@last_captcha_failed_val = nil
+	def last_captcha_failed=(value)
+		@@last_captcha_failed_val=value
+	end
+	def last_captcha_failed
+		@@last_captcha_failed_val
+	end
+
+
 	def self.solve(captcha_file,key)
+		raise "antigate failed recently. please wait" if(!Antigate.last_captcha_failed.nil? && Time.new - Antigate.last_captcha_failed < 100)
 		agent = Mechanize.new
 		f = File.new(captcha_file, "rb")
 		res_post_captcha = agent.post('http://antigate.com/in.php', {"key" => key,"file"=>f, "method" => "post"}).body
@@ -14,8 +24,15 @@ class Antigate
 					return res_captcha.split("|").last
 				elsif(res_captcha=="CAPCHA_NOT_READY")
 					sleep 5
+				elsif "ERROR_NO_SLOT_AVAILABLE" 
+					raise res_captcha
+				elsif "ERROR_CAPTCHA_UNSOLVABLE"
+					raise res_captcha
+				elsif "ERROR_BAD_DUPLICATES"
+					raise res_captcha
 				else
 					raise res_captcha
+					Antigate.last_captcha_failed = Time.now
 				end
 			end
 		else
