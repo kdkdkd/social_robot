@@ -640,11 +640,17 @@ $mutex_run_gui.synchronize{
 					if(Settings["captcha_solver"] == "0")
 						res = ask({"type" => "Image", "Path" => pict} => "string")[0]
 					else
-						begin
-							progress "Sending captcha to antigate #{pict}..."
-							res = Antigate.solve(File.expand_path("../../loot/captcha/#{pict}.jpg"),Settings["antigate_key"])
-						rescue
-							res = ask({"type" => "Image", "Path" => pict} => "string")[0]
+						res = nil
+						while(res.nil?)
+							begin
+								progress "Sending captcha to antigate #{pict}..."
+								res = Antigate.solve(File.expand_path("../../loot/captcha/#{pict}.jpg"),Settings["antigate_key"])
+              rescue Exception => e
+                case e.message
+                  when "ERROR_NO_SLOT_AVAILABLE" then res = nil; sleep 3
+                  else  res = ask({"type" => "Image", "Path" => pict} => "string")[0]
+                end
+							end
 						end
 					end
 					res
@@ -990,7 +996,9 @@ $mutex_run_gui.synchronize{
 	def me
 		return @me if @me
 		@me = login
-	end
+  end
+
+
 	
 	
 	#Asks to use anonymizer

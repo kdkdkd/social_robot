@@ -1,10 +1,19 @@
+#Получить список друзей
+friends = me.friends
+
+#Имена друзей
+names = friends.map{|friend| friend.name}
+
 #Спросить, какое сообщение отправлять
-result_ask = ask("Тема" => "string" , "Сообщение.\n$Имя будет заменено на имя пользователя.\n$ИмяФамилия на полное имя." => "text")
+result_ask = ask("Тема" => "string" , "Сообщение.\n$Имя будет заменено на имя пользователя.\n$ИмяФамилия на полное имя." => "text", "Имя друга с которого начать"=>{"Type" => "combo","Values" => names })
 title = result_ask[0]
 message = result_ask[1]
 
-#Получить список друзей
-friends = me.friends
+#Выбрать друга
+name = result_ask[2]
+
+#Обрезаем массив
+friends = friends[friends.index{|friend|friend.name==name}..friends.length-1]
 
 #Для каждого друга
 friends.each_with_index do |friend,index|

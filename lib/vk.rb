@@ -202,7 +202,7 @@ module Vkontakte
 		end
 		
 		def ask_captcha_internal(captcha_sid)
-			file_name = save(addr("/captcha.php?sid=#{captcha_sid}&s=1"),"captcha","#{captcha_sid}.jpg",true)
+			file_name = save(addr("/captcha.php?sid=#{captcha_sid}"),"captcha","#{captcha_sid}.jpg",true)
 			file_name_png = file_name.gsub(".jpg",".png")
 			command = "\"#{Vkontakte::convert_exe}\" \"#{file_name}\" \"#{file_name_png}\""
 			system(command)
@@ -224,7 +224,7 @@ module Vkontakte
 			res = File.join(path,basename + ext)
 			return res if File.exist?(res)
 			if(with_mechanize)
-				@agent.get(url).save(res)
+				@agent.get(url,[],nil,{'cookie' => @cookie_login}).save(res)
 			else
 				uri = URI(url)
 				Net::HTTP.start(uri.host) do |http|
@@ -946,8 +946,8 @@ module Vkontakte
 				sleep(@@mail_interval - diff) if(diff<@@mail_interval)
 			end
 			progress "Mailing #{@id}..."
-			post_decodehash = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0]
-			return unless post_decodehash
+      post_decodehash = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0]
+      return unless post_decodehash
 			chas = post_decodehash[0]
 			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
 			chas.reverse!
