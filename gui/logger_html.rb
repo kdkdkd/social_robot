@@ -34,7 +34,6 @@
 	 when :image_unlike then res = "Убран лайк к #{args[1].pretty_string}"
 	 
 	 
-	 when :exception_user_mail then res = "Ошибка во время отправки почты: #{args[1].message}"
 	 when :exception_antigate then res = "Ошибка с сервисом antigat.com: #{args[1].message}"
    end
    res.to_s

@@ -10,7 +10,16 @@ module Vkontakte
 	def countries
 		@@countries
 	end
-
+	
+	#Skip errors
+	def safe
+		begin
+			yield
+		rescue Exception => e
+			failed e.message
+		end
+	end
+	
 	#Output message about what system has done
 	#This function can be overloaded by client
 	#If has one argument - it holds the brief action, what system is doing
@@ -19,10 +28,21 @@ module Vkontakte
 		@@progress_block = block if block
 		@@progress_block.call(*args) if defined?(@@progress_block) && args.length>0
 	end
+	
+	
+	def failed(*args, &block)
+		@@failed_block = block if block
+		@@failed_block.call(*args) if defined?(@@failed_block) && args.length>0
+	end
 
 	@@user_fetch_interval = 2.1
 	def user_fetch_interval=(value)
 		@@user_fetch_interval=value
+	end
+	
+	@@transform_captcha = false
+	def transform_captcha=(value)
+		@@transform_captcha=value
 	end
 
 	@@photo_mark_interval = 5
@@ -50,10 +70,10 @@ module Vkontakte
 	end
 	
 	#which page is to refer all reqests
-	@@vkontakte_location_var = "http://vkontakte.ru"
+	@@vkontakte_location_var = "http://vk.com"
 	
 	#change page which refers all requests
-	def force_location(location = "http://vkontakte.ru")
+	def force_location(location = "http://vk.com")
 		@@vkontakte_location_var = location
 	end
 	
@@ -181,7 +201,7 @@ module Vkontakte
 			begin
 				cookie_value = IO.read(session_file)	
 				@cookie_login = Mechanize::Cookie.new("remixsid", cookie_value)
-				@cookie_login.domain = ".vkontakte.ru"
+				@cookie_login.domain = ".vk.com"
 				@cookie_login.path = "/"
 				return true
 			rescue
@@ -203,12 +223,18 @@ module Vkontakte
 		
 		def ask_captcha_internal(captcha_sid)
 			file_name = save(addr("/captcha.php?sid=#{captcha_sid}"),"captcha","#{captcha_sid}.jpg",true)
-			file_name_png = file_name.gsub(".jpg",".png")
-			command = "\"#{Vkontakte::convert_exe}\" \"#{file_name}\" \"#{file_name_png}\""
-			system(command)
+			if(@@transform_captcha)
+				file_name_png = file_name.gsub(".jpg",".png")
+				command = "\"#{Vkontakte::convert_exe}\" \"#{file_name}\" \"#{file_name_png}\""
+				system(command)
+			end
 			captcha_key = ask_captcha(captcha_sid)
-			File.delete file_name
-			File.delete file_name_png
+			
+			begin
+				File.delete file_name
+				File.delete file_name_png if(@@transform_captcha)
+			rescue
+			end
 			captcha_key
 		end
 
@@ -290,9 +316,9 @@ module Vkontakte
 		end
 
 		
-		#Add vkontakte.ru to address
+		#Add vk.com to address
 		def addr(rel = "")
-			if(rel.index("vkontakte.ru"))
+			if(rel.index("vk.com"))
 				return rel
 			else
 				return vkontakte_location() + rel
@@ -347,7 +373,8 @@ module Vkontakte
 					break
 				end
 			end
-
+			
+			progress "Logging in..."
 			@agent.get(addr("/")) do |login_page|
 				login_result = login_page.form_with(:name => 'login') do |login|
 					login.pass = @password
@@ -496,7 +523,7 @@ module Vkontakte
 				
 				
 				#Finishing action
-				music_res = connect.post('/audio',res).scan(/\[[^\]]*\]/).find{|x| x.index("vkontakte.ru")}
+				music_res = connect.post('/audio',res).scan(/\[[^\]]*\]/).find{|x| x.index("vk.com")}
 				res_internal = Music.new.set_array(JSON.parse(music_res),connect)
 				progress :music_uploaded,res_internal
 				if many
@@ -939,42 +966,38 @@ module Vkontakte
 		end
 		
 		def mail(message, title = "",connector=nil)
-			begin
-				connect = forсe_login(connector,@connect)
+			connect = forсe_login(connector,@connect)
 
-				if(connect.last_user_mail)
-					diff = Time.new - connect.last_user_mail
-					sleep(@@mail_interval - diff) if(diff<@@mail_interval)
-				end
-				progress "Mailing #{@id}..."
-				post_decodehash = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0]
-				return unless post_decodehash
-				chas = post_decodehash[0]
-				chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
-				chas.reverse!
-
-				captcha_sid = nil
-				captcha_key = nil
-				while true
-					hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
-					unless(captcha_key.nil?)
-						hash["captcha_sid"] = captcha_sid
-						hash["captcha_key"] = captcha_key
-					end
-					res = connect.post('/al_mail.php', hash)
-					if(res.index("<div"))
-						break
-					else
-						a = res.split("<!>")
-						captcha_sid = a[a.length-2]
-						captcha_key = connect.ask_captcha_internal(captcha_sid)
-					end
-				end
-				progress :user_mail,self,message
-				connect.last_user_mail = Time.new
-			rescue Exception => e
-				progress :exception_user_mail,e
+			if(connect.last_user_mail)
+				diff = Time.new - connect.last_user_mail
+				sleep(@@mail_interval - diff) if(diff<@@mail_interval)
 			end
+			progress "Mailing #{@id}..."
+			post_decodehash = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0]
+			return unless post_decodehash
+			chas = post_decodehash[0]
+			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
+			chas.reverse!
+
+			captcha_sid = nil
+			captcha_key = nil
+			while true
+				hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
+				unless(captcha_key.nil?)
+					hash["captcha_sid"] = captcha_sid
+					hash["captcha_key"] = captcha_key
+				end
+				res = connect.post('/al_mail.php', hash)
+				if(res.index("<div"))
+					break
+				else
+					a = res.split("<!>")
+					captcha_sid = a[a.length-2]
+					captcha_key = connect.ask_captcha_internal(captcha_sid)
+				end
+			end
+			progress :user_mail,self,message
+			connect.last_user_mail = Time.new
 		end
 		
 		

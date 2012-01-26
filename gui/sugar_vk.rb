@@ -7,7 +7,16 @@ class Array
   #download something and display total on progress bar
   def download(*params)
     i = 0
-		self.inject([]){|a,x| i+=1; show_progress(i,length) if defined?(show_progress);a.push(x.download(*params)) if x.respond_to?('download');a}.uniq
+	self.inject([])	do |a,x| 
+		i+=1
+		show_progress(i,length) if defined?(show_progress)
+		if x.respond_to?('download')
+			res_one = nil
+			safe{ res_one = x.download(*params) }
+			a.push(res_one) unless res_one.nil?
+		end
+		a
+	end.uniq
   end
   #do not display total
   def download_no_progress(*params)

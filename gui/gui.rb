@@ -17,10 +17,8 @@ include Vkontakte
 Vkontakte::application_directory = File.expand_path("../..")
 
 
-$mutex_log_edit = Mutex.new
-$mutex_progress_text = Mutex.new
-$mutex_progress = Mutex.new
-$mutex_run_gui = Mutex.new
+$mutex = Mutex.new
+
 $app = Qt::Application.new(ARGV)
 
 #Output message from system to console or log window
@@ -59,19 +57,19 @@ class SocialRobot < Qt::MainWindow
 		@log_edit.openLinks = false
 
 
-    @progress = Qt::ProgressBar.new
-    @progress_text = Qt::Label.new
-    @progress_text.text = ""
+		@progress = Qt::ProgressBar.new
+		@progress_text = Qt::Label.new
+		@progress_text.text = ""
 
-    statusBar().insertPermanentWidget(0,@progress_text,0)
-    statusBar().insertPermanentWidget(1,@progress,0)
+		statusBar().insertPermanentWidget(0,@progress_text,0)
+		statusBar().insertPermanentWidget(1,@progress,0)
 
 
 		connect(@log_edit,SIGNAL('anchorClicked( const QUrl & )'),self,SLOT('link_clicked( const QUrl & )'))
 		@help_tree = Qt::TreeWidget.new
-    @log_edit.setStyleSheet("QTextBrowser{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
-    @code_edit.setStyleSheet("QTextEdit{font: 15px;background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
-    @help_tree.setStyleSheet("QTreeWidget{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
+		@log_edit.setStyleSheet("QTextBrowser{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
+		@code_edit.setStyleSheet("QTextEdit{font: 15px;background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
+		@help_tree.setStyleSheet("QTreeWidget{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
 
 
 		#Properties of main widgets
@@ -224,9 +222,9 @@ class SocialRobot < Qt::MainWindow
 		
 		@fileMenu.addAction(@run_action)
 		@fileMenu.addAction(@stop_action)
-    @fileMenu.addAction(@loot_action)
-	  @fileMenu.addAction(@kill_session_action)
-	  @fileMenu.addAction(@developer_mode_action)
+		@fileMenu.addAction(@loot_action)
+		@fileMenu.addAction(@kill_session_action)
+		@fileMenu.addAction(@developer_mode_action)
 		@fileMenu.addAction(@open_settings_action)
 		@fileMenu.addAction(@exit_action)
 		
@@ -252,10 +250,10 @@ class SocialRobot < Qt::MainWindow
 		#Lines to add to log
 		@new_lines = []
 
-    #Status text to display
+		#Status text to display
 		@new_progress_text = nil
 
-    #Percent of progress to display
+		#Percent of progress to display
 		@new_progress = nil
 
 		#Working thread
@@ -276,44 +274,42 @@ class SocialRobot < Qt::MainWindow
 
 		#On iddle 
 		block = Proc.new do
-			$mutex_log_edit.synchronize {
-			  if(@new_lines)
-          if(@new_lines.length>0)
-
-            lines_to_add = @new_lines[0..20]
-            @new_lines = @new_lines[21..@new_lines.length-1]
-            lines_to_add.each {|line| @log_edit.append(line)}
-          end
-        else
-           @new_lines = []
+			if($mutex.try_lock)
+				if(@new_lines)
+					if(@new_lines.length>0)
+						lines_to_add = @new_lines[0..20]
+						@new_lines = @new_lines[21..@new_lines.length-1]
+						@new_lines = [] unless @new_lines
+						lines_to_add.each {|line| @log_edit.append(line)}
+					end
+				else
+					@new_lines = []
 				end
-			}
 
-      $mutex_progress_text.synchronize{
-        if @new_progress_text
-           @progress_text.text = @new_progress_text
-           @new_progress_text = nil
-        end
-      }
+				if @new_progress_text
+					@progress_text.text = @new_progress_text
+					@new_progress_text = nil
+				end
 
-      $mutex_progress.synchronize{
-        if @new_progress
-           @progress.setRange(1,@new_progress[1])
-           @progress.setValue(@new_progress[0])
-           @new_progress = nil
-        end
-      }
-$mutex_run_gui.synchronize{
-			if(@disable_run_gui)
-				run_gui(true)
-				@disable_run_gui = false
+				if @new_progress
+					@progress.setRange(1,@new_progress[1])
+					@progress.setValue(@new_progress[0])
+					@new_progress = nil
+				end
+
+				if(@disable_run_gui)
+					run_gui(true)
+					@disable_run_gui = false
+				end
+				$mutex.unlock
 			end
-			}
+			
+			
 			if @ask_proxy.length > 0
 				@res_proxy = ask_user_internal(@ask_proxy)
 				@ask_proxy = []
 			end
-			
+		
 			Thread.pass
 		end
 		
@@ -327,15 +323,14 @@ $mutex_run_gui.synchronize{
 		
 		update_developer_mode()
 
-    #Remember user input
-    @memory_input = {}
+		#Remember user input
+		@memory_input = {}
 	end
 	
 	#When user clics on link
 	def link_clicked(url)
 		Qt::DesktopServices::openUrl(url)
 	end
-	
 	
 	
 	#toggle developer mode
@@ -355,19 +350,19 @@ $mutex_run_gui.synchronize{
 		if(Settings["developer_mode"] == "true")
 			@code_edit.Visible = true
 			@help_dock.Visible = true
-      @file_toolbar.Visible = true
-      @save_action.Visible = true
-      @open_action.Visible = true
-      @new_action.Visible = true
-      @run_action.Visible = true
+			@file_toolbar.Visible = true
+			@save_action.Visible = true
+			@open_action.Visible = true
+			@new_action.Visible = true
+			@run_action.Visible = true
 		else
 			@code_edit.Visible = false
 			@help_dock.Visible = false
-      @file_toolbar.Visible = false
-      @save_action.Visible = false
-      @open_action.Visible = false
-      @new_action.Visible = false
-      @run_action.Visible = false
+			@file_toolbar.Visible = false
+			@save_action.Visible = false
+			@open_action.Visible = false
+			@new_action.Visible = false
+			@run_action.Visible = false
 		end
 	end
 	
@@ -426,10 +421,10 @@ $mutex_run_gui.synchronize{
 		@code_edit.plainText = text
         @changed = false
 		if Settings["developer_mode"] == "false"
-		  @thread.kill if @thread
-      while @thread && @thread.alive? do
-        sleep 0.1
-      end
+			@thread.kill if @thread
+			while @thread && @thread.alive? do
+				sleep 0.1
+			end
 			run_gui(true)
 			run_script
 		end
@@ -443,63 +438,62 @@ $mutex_run_gui.synchronize{
 
 	def open(path)
 		Qt::DesktopServices::openUrl(Qt::Url.new("file:///#{path}"));
-  end
+	end
 
-  def notify
-    open(File.expand_path("./sounds/notification.mp3"))
-  end
+	def notify
+		open(File.expand_path("./sounds/notification.mp3"))
+	end
 
 	#Log with red color
 	def log_error(text)
 		text = text.to_s
 		text.force_encoding("UTF-8")
-		$mutex_log_edit.synchronize {
+		$mutex.lock
 			@new_lines << ("<font color='red' size='3'>" + text + "</font>")
-		}
+		$mutex.unlock
 	end
 
 	#Log with green color
 	def log_success(text)
 		text = text.to_s
 		text.force_encoding("UTF-8")
-		$mutex_log_edit.synchronize {
+		$mutex.lock
 			@new_lines << ("<font color='green' size='3'>" + text + "</font>")
-		}
+		$mutex.unlock
 	end
 
 	#Log with black color
 	def log_ok(text)
 		#text = text.to_s
 		#text.force_encoding("UTF-8")
-		$mutex_log_edit.synchronize {
-			
-			if(text.class.name == "Array")
-				text_array = text
-			else
-				text = text.to_s
-				text.force_encoding("UTF-8")
-				text_array = [text]
-			end
+		if(text.class.name == "Array")
+			text_array = text
+		else
+			text = text.to_s
+			text.force_encoding("UTF-8")
+			text_array = [text]
+		end
+		$mutex.lock
 			text_array.each do |text_line|
 				@new_lines << "<font color='black' size='3'>" + text_line.to_s + "</font>"
 			end
-		}
-  end
+		$mutex.unlock
+	end
 
-  #show total on gui progress bar
-  def total(value,range)
-    $mutex_progress.synchronize {
+	#show total on gui progress bar
+	def total(value,range)
+		$mutex.lock
 			@new_progress = [value,range]
-		}
-  end
+		$mutex.unlock
+	end
 
 	#Log with small grey font
 	def log_small(text)
 		text = text.to_s
 		text.force_encoding("UTF-8")
-		$mutex_log_edit.synchronize {
+		$mutex.lock
 			@new_lines << ("<font color='grey' size='3'>" + text + "</font>")
-		}
+		$mutex.unlock
 	end
 
 	#Ask if discard code edit changes or not
@@ -507,7 +501,7 @@ $mutex_run_gui.synchronize{
 		return true if !@changed || @code_edit.plainText.length == 0
 		msgBox = Qt::MessageBox.new
 		msgBox.setText("Скрипт не сохранен.")
-    msgBox.setInformativeText("Все равно продолжить?")
+		msgBox.setInformativeText("Все равно продолжить?")
 		msgBox.setStandardButtons(Qt::MessageBox::Ok | Qt::MessageBox::Cancel)
 		msgBox.setDefaultButton(Qt::MessageBox::Cancel)
 		res = msgBox.exec() == Qt::MessageBox::Ok
@@ -586,13 +580,13 @@ $mutex_run_gui.synchronize{
 		@thread.kill if @thread
 		run_gui(true)
 		@progress_text.text = "Остановлено"
-    @progress_text.setStyleSheet("QLabel { color : red; }");
+		@progress_text.setStyleSheet("QLabel { color : red; }");
 	end
 	
 	def set_disable_run_gui
-		$mutex_run_gui.synchronize {
+		$mutex.lock
 			@disable_run_gui = true
-		}
+		$mutex.unlock
 	end
 
 	#Toggle start/stop buttons
@@ -604,18 +598,21 @@ $mutex_run_gui.synchronize{
 	end
 	
 	def progress_text(text)
-		$mutex_progress_text.synchronize {
-      	   @new_progress_text = text
-		}
+		$mutex.lock
+			@new_progress_text = text
+		$mutex.unlock
 	end
+	
+	
+	
 	#On run script clicked
 	def run_script
 		return if @thread && @thread.alive?
-    $mutex_log_edit.synchronize {
-        @new_lines = []
-    }
-    @log_edit.clear()
-    @progress_text.setStyleSheet("QLabel { color : black; }");
+		$mutex.lock
+			@new_lines = []
+		$mutex.unlock
+		@log_edit.clear()
+		@progress_text.setStyleSheet("QLabel { color : black; }");
 		@progress_text.text = "Запуск..."
 
 		s = @code_edit.plainText
@@ -633,6 +630,9 @@ $mutex_run_gui.synchronize{
 						robot.log_ok log_html(*args)
 					end
 				end
+				failed do |*args|
+					robot.log_error args[0]
+				end
 				show_progress do |value,range|
 					robot.total(value,range)
 				end
@@ -648,7 +648,6 @@ $mutex_run_gui.synchronize{
 								progress "Sending captcha to antigate #{pict}..."
 								res = Antigate.solve(File.expand_path("../../loot/captcha/#{pict}.jpg"),Settings["antigate_key"])
 							rescue Exception => e
-								
 								case e.message
 									when "ERROR_NO_SLOT_AVAILABLE" then res = nil; sleep 5
 									when "ERROR_CAPTCHA_UNSOLVABLE" then res = "asdas"
@@ -674,7 +673,7 @@ $mutex_run_gui.synchronize{
 				Vkontakte.mail_interval = Settings["mail_interval"].to_f
 				Vkontakte.post_interval = Settings["post_interval"].to_f
 				Vkontakte.invite_interval = Settings["invite_interval"].to_f
-
+				Vkontakte.transform_captcha = Settings["captcha_solver"] == "0"
 				eval(script)
 				progress "Выполнено"
 				#@progress_text.setStyleSheet("QLabel { color : green; }");
@@ -701,17 +700,21 @@ $mutex_run_gui.synchronize{
 	
 	#Create universal dialog
 	def ask(params = {})
-		@res_proxy = []
-		@ask_proxy = params
+		
+			@res_proxy = []
+			@ask_proxy = params
+		
 		while(true) do
-      if(@res_proxy.length == 1 && @res_proxy[0].nil?)
-        raise "Отменено пользователем"
-      end
+			
+			if(@res_proxy.length == 1 && @res_proxy[0].nil?)
+				raise "Отменено пользователем"
+			end
 			if(@res_proxy.length >0)
 				res = @res_proxy
 				@res_proxy = []
 				return res
 			end
+	
 			sleep 0.1
 		end
 	end
@@ -719,45 +722,44 @@ $mutex_run_gui.synchronize{
 	#Shortcut to ask
 	def ask_string(str = "Введите строку")
 		ask(str => "string")[0]
-  end
+	end
 
-  #Shortcut to ask
+	#Shortcut to ask
 	def ask_text(str = "Введите текст")
 		ask(str => "text")[0]
-  end
+	end
 
-  def ask_peoples
+	def ask_peoples
+		r = ask(
+		 "Критерий(Имя или интерес)" => "string" ,
+		 "Искать по.." => {"Type" => "combo","Values" => ["По интересам","По имени"] },
+		 "Сортировать по.." => {"Type" => "combo","Values" => ["По рейтингу","По дате регистрации"] },
+		 "Страна" => {"Type" => "combo","Values" => ["Не важно"] + Vkontakte.countries.keys },
+		 "Город" => "string" ,
+		 "Количество результатов" => {"Type" => "int","Default" => 100, "Minimum" => 1 },
+		 "Начиная с..." => {"Type" => "int","Default" => 0, "Minimum" => 0, "Maximum" => 999 },
+		 "Пол"=>{"Type" => "combo","Values" => ["Не важно","Мужской","Женский"] },
+		 "Онлайн"=>{"Type" => "combo","Values" => ["Не важно","Только онлайн"] },
+		 "От"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a },
+		 "До"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a }
+		)
 
-   r = ask(
-     "Критерий(Имя или интерес)" => "string" ,
-     "Искать по.." => {"Type" => "combo","Values" => ["По интересам","По имени"] },
-     "Сортировать по.." => {"Type" => "combo","Values" => ["По рейтингу","По дате регистрации"] },
-     "Страна" => {"Type" => "combo","Values" => ["Не важно"] + Vkontakte.countries.keys },
-     "Город" => "string" ,
-     "Количество результатов" => {"Type" => "int","Default" => 100, "Minimum" => 1 },
-     "Начиная с..." => {"Type" => "int","Default" => 0, "Minimum" => 0, "Maximum" => 999 },
-     "Пол"=>{"Type" => "combo","Values" => ["Не важно","Мужской","Женский"] },
-     "Онлайн"=>{"Type" => "combo","Values" => ["Не важно","Только онлайн"] },
-     "От"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a },
-     "До"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a }
-   )
-
-    q = { }
-
-
-    q["Страна"] = r[3] if r[3] != "Не важно"
-    q["Город"] = r[4] if r[4].length>0
-
-    q["Пол"] = r[7] if r[7] != "Не важно"
-    q["Онлайн"] = "Да" if r[8] != "Не важно"
-    q["От"] =  r[9] if r[9] != "Не важно"
-    q["До"] =  r[10] if r[10] != "Не важно"
-    q["По имени"] =  (r[1] == "По имени")?"Да":"Нет"
-    q["По дате"] =  (r[2] == "По дате регистрации")?"Да":"Нет"
+		q = { }
 
 
-    res = User.all(r[0],r[5],r[6],q)
-    res
+		q["Страна"] = r[3] if r[3] != "Не важно"
+		q["Город"] = r[4] if r[4].length>0
+
+		q["Пол"] = r[7] if r[7] != "Не важно"
+		q["Онлайн"] = "Да" if r[8] != "Не важно"
+		q["От"] =  r[9] if r[9] != "Не важно"
+		q["До"] =  r[10] if r[10] != "Не важно"
+		q["По имени"] =  (r[1] == "По имени")? "Да" : "Нет"
+		q["По дате"] =  (r[2] == "По дате регистрации")? "Да" : "Нет"
+
+
+		res = User.all(r[0],r[5],r[6],q)
+		res
    end
 	
 	#Shortcut to ask
@@ -774,9 +776,6 @@ $mutex_run_gui.synchronize{
     def ask_files(str = "Выберите файлы")
 		ask(str => "files")[0]
 	end
-
-	
-	
 	
 	#Create universal dialog thread unsafe
 	def ask_user_internal(params = {})
@@ -786,114 +785,111 @@ $mutex_run_gui.synchronize{
 		index = 0
 		controls = []
 		@controls_hash = {}
-    label_hash = {}
+		label_hash = {}
 		params.each_key do |param| 
 			param_label = nil
-      if param.class.name == "Hash"
+			if param.class.name == "Hash"
 				if(param["type"]=="Image")
 					pixmap = Qt::Pixmap.new("../../loot/captcha/#{param["Path"]}.png")
 					label = Qt::Label.new;
 					label.setPixmap(pixmap);
 				end
-	
 			else
 				label = Qt::Label.new
 				param_real = param.dup
-        param_label = param_real.dup
+				param_label = param_real.dup
 				param_real.force_encoding("UTF-8")
 				label.text = param_real
-      end
-      value_hash = params[param]
-      input = nil
-      default = @memory_input[param_label]
-      if(value_hash.class.name == "Hash")
-         if value_hash["Type"] == "combo"
-           input = Qt::ComboBox.new
+			end
+			value_hash = params[param]
+			input = nil
+			default = @memory_input[param_label]
+			if(value_hash.class.name == "Hash")
+				if value_hash["Type"] == "combo"
+					input = Qt::ComboBox.new
 
-           selected_item_index = -1
-           value_hash["Values"].each_with_index{|x,i|input.insertItem(i,x.to_s);selected_item_index = i if x.to_s == default.to_s}
-           input.setCurrentIndex(selected_item_index) if selected_item_index>=0
-           controls.push(input)
-           layout.addWidget(input,index,1)
-         elsif value_hash["Type"] == "int"
-            input = Qt::SpinBox.new
-            input.minimum = value_hash["Minimum"] if value_hash["Minimum"]
+					selected_item_index = -1
+					value_hash["Values"].each_with_index{|x,i|input.insertItem(i,x.to_s);selected_item_index = i if x.to_s == default.to_s}
+					input.setCurrentIndex(selected_item_index) if selected_item_index>=0
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				elsif value_hash["Type"] == "int"
+					input = Qt::SpinBox.new
+					input.minimum = value_hash["Minimum"] if value_hash["Minimum"]
 
-            input.maximum = 99999
-            input.maximum = value_hash["Maximum"] if value_hash["Maximum"]
-            input.value = value_hash["Default"] if value_hash["Default"]
+					input.maximum = 99999
+					input.maximum = value_hash["Maximum"] if value_hash["Maximum"]
+					input.value = value_hash["Default"] if value_hash["Default"]
 
-            input.value = default if(default && default.class.name == "Fixnum")
+					input.value = default if(default && default.class.name == "Fixnum")
 
-            controls.push(input)
-            layout.addWidget(input,index,1)
-         end
-      else
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				end
+			else
 
-        case value_hash
-          when "check"
-            input = Qt::CheckBox.new
-            input.checked = default == true
-            controls.push(input)
-            layout.addWidget(input,index,1)
-          when "text"
-            input = Qt::TextEdit.new
+			case value_hash
+				when "check"
+					input = Qt::CheckBox.new
+					input.checked = default == true
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				when "text"
+					input = Qt::TextEdit.new
 
-            input.plainText = default.to_s if(default)
-            controls.push(input)
-            layout.addWidget(input,index,1)
-          when "string"
-            input = Qt::LineEdit.new
-            input.text = default.to_s if(default)
-            controls.push(input)
-            layout.addWidget(input,index,1)
-          when "int"
-            input = Qt::SpinBox.new
-            input.minimum = 0
-            input.maximum = 99999
-            input.value = 1
-            input.value = default if(default && default.class.name == "Fixnum")
+					input.plainText = default.to_s if(default)
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				when "string"
+					input = Qt::LineEdit.new
+					input.text = default.to_s if(default)
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				when "int"
+					input = Qt::SpinBox.new
+					input.minimum = 0
+					input.maximum = 99999
+					input.value = 1
+					input.value = default if(default && default.class.name == "Fixnum")
 
-            controls.push(input)
-            layout.addWidget(input,index,1)
-          when "pass"
-            input = Qt::LineEdit.new
-            input.EchoMode = Qt::LineEdit::Password
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				when "pass"
+					input = Qt::LineEdit.new
+					input.EchoMode = Qt::LineEdit::Password
 
-            controls.push(input)
-            layout.addWidget(input,index,1)
-          when "files"
-            hlayout = Qt::HBoxLayout.new
-            input = Qt::LineEdit.new
-            button = Qt::PushButton.new
-            @controls_hash[button] = input
-            button.text = "..."
-            input.text = default.to_s if(default)
-            hlayout.addWidget(input)
+					controls.push(input)
+					layout.addWidget(input,index,1)
+				when "files"
+					hlayout = Qt::HBoxLayout.new
+					input = Qt::LineEdit.new
+					button = Qt::PushButton.new
+					@controls_hash[button] = input
+					button.text = "..."
+					input.text = default.to_s if(default)
+					hlayout.addWidget(input)
 
-            hlayout.addWidget(button)
-            connect(button,SIGNAL('clicked()'),self,SLOT('open_files_clicked()'))
-            controls.push(button)
-            layout.addLayout(hlayout,index,1)
-          when "file"
-            hlayout = Qt::HBoxLayout.new
-            input = Qt::LineEdit.new
-            button = Qt::PushButton.new
-            @controls_hash[button] = input
-            button.text = "..."
-            input.text = default.to_s if(default)
-            hlayout.addWidget(input)
-            hlayout.addWidget(button)
-            connect(button,SIGNAL('clicked()'),self,SLOT('open_file_clicked()'))
-            controls.push(input)
-            layout.addLayout(hlayout,index,1)
-          else
-            input = Qt::LineEdit.new
-            input.text = default.to_s if(default)
-        end
-
-
-      end
+					hlayout.addWidget(button)
+					connect(button,SIGNAL('clicked()'),self,SLOT('open_files_clicked()'))
+					controls.push(button)
+					layout.addLayout(hlayout,index,1)
+				when "file"
+					hlayout = Qt::HBoxLayout.new
+					input = Qt::LineEdit.new
+					button = Qt::PushButton.new
+					@controls_hash[button] = input
+					button.text = "..."
+					input.text = default.to_s if(default)
+					hlayout.addWidget(input)
+					hlayout.addWidget(button)
+					connect(button,SIGNAL('clicked()'),self,SLOT('open_file_clicked()'))
+					controls.push(input)
+					layout.addLayout(hlayout,index,1)
+				else
+					input = Qt::LineEdit.new
+					input.text = default.to_s if(default)
+				end
+			end
 			label_hash[input] = param_label if(!param_label.nil? && !input.nil?)
 			
 			
@@ -915,40 +911,38 @@ $mutex_run_gui.synchronize{
 		ask.setLayout(layout)
 		res_exec = ask.exec
 
-    if res_exec == 0
-        @timer.start
-        return [nil]
-    end
+		if res_exec == 0
+			@timer.start
+			return [nil]
+		end
 		res = []
 		controls.each do |control|
 
 			case control.class.name
-        when /TextEdit/
-          push_value = (control.plainText)
-					push_value.force_encoding("UTF-8")
-					res.push(push_value)
-				when /LineEdit/
-					push_value = (control.text)
-					push_value.force_encoding("UTF-8")
-					res.push(push_value)
+			when /TextEdit/
+				push_value = (control.plainText)
+				push_value.force_encoding("UTF-8")
+				res.push(push_value)
+			when /LineEdit/
+				push_value = (control.text)
+				push_value.force_encoding("UTF-8")
+				res.push(push_value)
+			when /SpinBox/
+				res.push(control.value)
+			when /PushButton/
+				text = @controls_hash[control].text
+				text.force_encoding("UTF-8")
+				res.push(text.split("|"))
+			when /ComboBox/
+				text = control.currentText
+				text.force_encoding("UTF-8")
+				res.push(text)
+			when /CheckBox/
+				res.push(control.checked)
+			end
 
-				when /SpinBox/
-					res.push(control.value)
-				when /PushButton/
-					text = @controls_hash[control].text
-					text.force_encoding("UTF-8")
-					res.push(text.split("|"))
-        when /ComboBox/
-          text = control.currentText
-          text.force_encoding("UTF-8")
-          res.push(text)
-        when /CheckBox/
-          res.push(control.checked)
-
-      end
-
-        string_label = label_hash[control]
-        @memory_input[string_label] = res.last if(string_label)
+			string_label = label_hash[control]
+			@memory_input[string_label] = res.last if(string_label)
 
 		end
 		
@@ -1001,7 +995,7 @@ $mutex_run_gui.synchronize{
 	def me
 		return @me if @me
 		@me = login
-  end
+	end
 
 
 	
@@ -1016,7 +1010,7 @@ $mutex_run_gui.synchronize{
 		agent.user_agent_alias = 'Mac Safari'
 		page = agent.get "http://cameleo.ru/"
 		search_form = page.form :id => "proxy"
-		search_form.field_with(:name => "url").value = "vkontakte.ru"
+		search_form.field_with(:name => "url").value = "vk.com"
 		search_results = agent.submit search_form
 		@anonymizer = "http://" + search_results.uri.host
 		force_location @anonymizer
@@ -1048,13 +1042,13 @@ widget.raise
 
 
 splash = "../../splash/pid.txt"
- if File.exist?(splash)
+if File.exist?(splash)
 	begin
 		Process.kill "KILL", IO.read(splash).to_i
 	rescue
 	end
 	File.delete(splash)
- end
+end
 	
 $app.exec
 
