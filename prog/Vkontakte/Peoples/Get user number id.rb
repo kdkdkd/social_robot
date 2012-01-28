@@ -1,8 +1,8 @@
 #Найти пользователя
-user = User.parse(ask_string("Адрес страницы"))
+user = safe{User.parse(ask_string("Адрес страницы"))}
 
 #Получить его id 
-id = user.id
+id = safe{user.id}
 
 
 if id.nil?

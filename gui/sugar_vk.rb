@@ -4,136 +4,226 @@
 
 
 class Array
-  #download something and display total on progress bar
-  def download(*params)
-    i = 0
-	self.inject([])	do |a,x| 
-		i+=1
-		show_progress(i,length) if defined?(show_progress)
-		if x.respond_to?('download')
-			res_one = nil
-			safe{ res_one = x.download(*params) }
-			a.push(res_one) unless res_one.nil?
-		end
-		a
-	end.uniq
-  end
-  #do not display total
-  def download_no_progress(*params)
-		self.inject([]){|a,x| a.push(x.download(*params)) if x.respond_to?('download');a}.uniq
-  end
 
-  def mark(*params)
-    i = 0
-		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress);x.mark(*params) if x.respond_to?('mark')}
-  end
-  #do not display total
-	def mark_no_progress(*params)
-		self.each{|x| x.mark(*params) if x.respond_to?('mark')}
-  end
-
-  def invite(*params)
-    i = 0
-		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); x.invite(*params) if x.respond_to?('invite')}
+	#download something and display total on progress bar
+	def download(*params)
+		i = 0
+		self.inject([])	do |a,x| 
+			i+=1
+			show_progress(i,length) if defined?(show_progress)
+			if x.respond_to?('download')
+				res_one = safe{ x.download(*params) }
+				a.push(res_one) unless res_one.nil?
+			end
+			a
+		end.uniq
 	end
-  #do not display total
+
+	#do not display total
+	def download_no_progress(*params)
+		self.inject([]) do |a,x| 
+			if x.respond_to?('download')
+				res_one = safe{ x.download(*params) }
+				a.push(res_one) unless res_one.nil? 
+			end
+			a 
+		end.uniq
+	end
+
+	def mark(*params)
+		i = 0
+		self.each do |x| 
+			i+=1
+			show_progress(i,length) if defined?(show_progress)
+			safe{ x.mark(*params) } if x.respond_to?('mark')
+		end
+	end
+	
+	#do not display total
+	def mark_no_progress(*params)
+		self.each{|x| safe{x.mark(*params)} if x.respond_to?('mark')}
+	end
+
+	def invite(*params)
+		i = 0
+		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); safe{x.invite(*params)} if x.respond_to?('invite')}
+	end
+	
+	#do not display total
 	def invite_no_progress(*params)
-		self.each{|x| x.invite(*params) if x.respond_to?('invite')}
-  end
+		self.each{|x| safe{x.invite(*params)} if x.respond_to?('invite')}
+	end
 
 	def uninvite(*params)
-    i = 0
-		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); x.uninvite(*params) if x.respond_to?('uninvite')}
-  end
-  #do not display total
-  def uninvite_no_progress(*params)
-		self.each{|x| x.uninvite(*params) if x.respond_to?('uninvite')}
-  end
+		i = 0
+		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); safe{x.uninvite(*params)} if x.respond_to?('uninvite')}
+	end
+	
+	#do not display total
+	def uninvite_no_progress(*params)
+		self.each{|x| safe{x.uninvite(*params)} if x.respond_to?('uninvite')}
+	end
 
 	def remove(*params)
-    i = 0
-		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); x.remove(*params) if x.respond_to?('remove')}
-  end
-  #do not display total
-  def remove(*params)
-		self.each{|x| x.remove(*params) if x.respond_to?('remove')}
-  end
+		i = 0
+		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); safe{x.remove(*params)} if x.respond_to?('remove')}
+	end
+	
+	#do not display total
+	def remove_no_progress(*params)
+		self.each{|x| safe{x.remove(*params)} if x.respond_to?('remove')}
+	end
 
 	def friends(*params)
-		self.inject([]){|a,x| x.friends(*params).each{|f| a.push(f)} if x.respond_to?('friends');a}.uniq
-  end
-  #display total
-  def friends_with_progress(*params)
-    i = 0
-		self.inject([]){|a,x| i+=1; show_progress(i,length) if defined?(show_progress); x.friends(*params).each{|f| a.push(f)} if x.respond_to?('friends');a}.uniq
-  end
+		self.inject([]) do |a,x| 
+			if x.respond_to?('friends')
+				res_friends = safe{x.friends(*params)}
+				res_friends.each{|f| a.push(f)} unless res_friends.nil?
+			end
+			a
+		end.uniq
+	end
+  
+	#display total
+	def friends_with_progress(*params)
+		i = 0
+		self.inject([]) do |a,x| 
+			i+=1; show_progress(i,length) if defined?(show_progress); 
+			if x.respond_to?('friends')
+				res_friends = safe{x.friends(*params)}
+				res_friends.each{|f| a.push(f)} unless res_friends.nil?
+			end
+			a
+		end.uniq
+	end
 
-  def groups(*params)
-		self.inject([]){|a,x| x.groups(*params).each{|f| a.push(f)} if x.respond_to?('groups');a}.uniq
-  end
+	def groups(*params)
+		self.inject([]) do |a,x| 
+			if x.respond_to?('groups')
+				res_groups = safe{x.groups(*params)}
+				res_groups.each{|f| a.push(f)} unless res_groups.nil?
+			end
+			a
+		end.uniq
+	end
 
 	def wall(*params)
-		self.inject([]){|a,x| x.wall(*params).each{|f| a.push(f)} if x.respond_to?('wall');a}.uniq
-  end
-
+		self.inject([]) do |a,x| 
+			if x.respond_to?('wall')
+				res_wall = safe{x.wall(*params)}
+				res_wall.each{|f| a.push(f)} unless res_wall.nil?
+			end
+			a
+		end.uniq
+	end
+	
 	def music(*params)
-		self.inject([]){|a,x| x.music(*params).each{|m| a.push(m)} if x.respond_to?('music');a}.uniq
-  end
+		self.inject([]) do |a,x| 
+			if x.respond_to?('music')
+				res_music = safe{x.music(*params)}
+				res_music.each{|f| a.push(f)} unless res_music.nil?
+			end
+			a
+		end.uniq
+	end
 
 	def albums(*params)
-		self.inject([]){|a,x| x.albums(*params).each{|m| a.push(m)} if x.respond_to?('albums');a}.uniq
-  end
-
+		self.inject([]) do |a,x| 
+			if x.respond_to?('albums')
+				res_albums = safe{x.albums(*params)}
+				res_albums.each{|f| a.push(f)} unless res_albums.nil?
+			end
+			a
+		end.uniq
+	end
+	
+	
 	def photos(*params)
-		self.inject([]){|a,x| x.photos(*params).each{|m| a.push(m)} if x.respond_to?('photos');a}.uniq
-  end
+		self.inject([]) do |a,x| 
+			if x.respond_to?('photos')
+				res_photos = safe{x.photos(*params)}
+				res_photos.each{|f| a.push(f)} unless res_photos.nil?
+			end
+			a
+		end.uniq
+	end
 
+	def like_no_progress(*params)
+		i = 0
+		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); safe{x.like(*params)} if x.respond_to?('like')}
+	end
+	
 	def like(*params)
-    i = 0
-		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); x.like(*params) if x.respond_to?('like')}
-  end
-  #do not display total
-  def like_no_progress(*params)
-		self.each{|x| x.like(*params) if x.respond_to?('like')}
-  end
+		self.each{|x| safe{x.like(*params)} if x.respond_to?('like')}
+	end
 
+
+	def unlike_no_progress(*params)
+		self.each{|x| safe{x.unlike(*params)} if x.respond_to?('unlike')}
+	end
 
 	def unlike(*params)
-		self.each{|x| x.unlike(*params) if x.respond_to?('unlike')}
-  end
+		i = 0
+		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); safe{ x.unlike(*params) } if x.respond_to?('unlike')}
+	end
 
-  #do not display total
-  def unlike_no_progress(*params)
-    i = 0
-		self.each{|x| i+=1; show_progress(i,length) if defined?(show_progress); x.unlike(*params) if x.respond_to?('unlike')}
-  end
-
-  def post(*params)
-		self.inject([]){|a,x| a.push(x.post(*params)) if x.respond_to?('post');a}.uniq
-  end
-  #do not display total
 	def post_no_progress(*params)
-    i = 0
-		self.inject([]){|a,x| i+=1; show_progress(i,length) if defined?(show_progress); a.push(x.post(*params)) if x.respond_to?('post');a}.uniq
-  end
+		self.inject([]) do |a,x| 
+			if x.respond_to?('post')
+				res_post = safe{x.post(*params)}
+				a.push(res_post) if res_post
+			end
+			a
+		end.uniq
+	end
+	
 
-  def mail(*params)
-		self.inject([]){|a,x| a.push(x.mail(*params)) if x.respond_to?('mail');a}.uniq
-  end
-  #do not display total
+	def post(*params)
+		i = 0
+		self.inject([]) do |a,x| 
+			i+=1
+			show_progress(i,length) if defined?(show_progress)
+			if x.respond_to?('post')
+				res_post = safe{x.post(*params)}
+				a.push(res_post) unless res_post.nil?
+			end
+			a
+		end.uniq
+	end
+
 	def mail_no_progress(*params)
-    i = 0
-		self.inject([]){|a,x|  i+=1; show_progress(i,length) if defined?(show_progress);a.push(x.mail(*params)) if x.respond_to?('mail');a}.uniq
+		self.inject([]) do |a,x| 
+			if x.respond_to?('mail')
+				res_mail = safe{x.mail(*params)}
+				a.push(res_mail) unless res_mail.nil?
+			end
+			a
+		end.uniq
+	end
+	
+	def mail(*params)
+		i = 0
+		self.inject([]) do |a,x|  
+			i+=1
+			show_progress(i,length) if defined?(show_progress)
+			if x.respond_to?('mail')
+				res_mail = safe{x.mail(*params)}
+				a.push(res_mail) unless res_mail.nil?
+			end
+			a
+		end.uniq
 	end
 
 	def all(search)
 		search.force_encoding("UTF-8")
 		self.select(){|x| x.to_s.index(search)}
 	end
+	
 	def one(search)
 		search.force_encoding("UTF-8")
 		self.find(){|x| x.to_s.index(search)}
 	end
+	
 	def pretty_string
 		res = []
 		b = "["

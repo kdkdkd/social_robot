@@ -10,13 +10,16 @@ new_album = Album.create(name, description)
 #Для каждого фото
 photos_list.each_with_index do |photo,i|
 
-    #Загрузить фото
-    new_album.upload(photo,"")
+    #Игнорируем ошибки
+    safe{
+          
+          #Загрузить фото
+          new_album.upload(photo,"")
 
 
-   #Обновить прогресс бар
-   total(i,photos_list.length)
-
+          #Обновить прогресс бар
+          total(i,photos_list.length)
+    }
 end
 
 

@@ -13,11 +13,14 @@ module Vkontakte
 	
 	#Skip errors
 	def safe
+		res = nil
 		begin
-			yield
+			res = yield
 		rescue Exception => e
-			failed e.message
+			progress :exception,e 
+			res = nil
 		end
+		res
 	end
 	
 	#Output message about what system has done
@@ -496,41 +499,43 @@ module Vkontakte
 			end
 			progress "Music uploading ..."
 			filenames.each do |filename|
-				#Asking for upload parameters and server
-				a = connect.post('/audio',{"act" => "new_audio", "al" => "1", "gid" => "0"}).scan(/Upload\.init\(\s*([^\,]+)\s*\,\s*([^\,]+)\s*\,\s*(\{[^\}]*\})/)
-				params = JSON.parse(a[0][2])
-				params["ajx"] = "1"
+				safe{
+					#Asking for upload parameters and server
+					a = connect.post('/audio',{"act" => "new_audio", "al" => "1", "gid" => "0"}).scan(/Upload\.init\(\s*([^\,]+)\s*\,\s*([^\,]+)\s*\,\s*(\{[^\}]*\})/)
+					params = JSON.parse(a[0][2])
+					params["ajx"] = "1"
 
 
-				addr = a[0][1].gsub("\"",'').gsub("'",'')
-				progress "Uploading " + filename
+					addr = a[0][1].gsub("\"",'').gsub("'",'')
+					progress "Uploading " + filename
 
-				#Uploading music
-				res = nil
-				safe_file_name(filename) do |file_safe|
-					f = File.new(file_safe, "rb")
-					params["file"] = f
-					res = JSON.parse(connect.post(addr,params))
-					f.close
-				end
+					#Uploading music
+					res = nil
+					safe_file_name(filename) do |file_safe|
+						f = File.new(file_safe, "rb")
+						params["file"] = f
+						res = JSON.parse(connect.post(addr,params))
+						f.close
+					end
 
-				
-				res["act"] = "done_add"
-				res["al"] = "1"
-				res["artist"] = CGI::unescape(res["artist"])
-				res["title"] = CGI::unescape(res["title"])
-				
-				
-				
-				#Finishing action
-				music_res = connect.post('/audio',res).scan(/\[[^\]]*\]/).find{|x| x.index("vk.com")}
-				res_internal = Music.new.set_array(JSON.parse(music_res),connect)
-				progress :music_uploaded,res_internal
-				if many
-					res_total.push(res_internal)
-				else
-					res_total = res_internal
-				end
+					
+					res["act"] = "done_add"
+					res["al"] = "1"
+					res["artist"] = CGI::unescape(res["artist"])
+					res["title"] = CGI::unescape(res["title"])
+					
+					
+					
+					#Finishing action
+					music_res = connect.post('/audio',res).scan(/\[[^\]]*\]/).find{|x| x.index("vk.com")}
+					res_internal = Music.new.set_array(JSON.parse(music_res),connect)
+					progress :music_uploaded,res_internal
+					if many
+						res_total.push(res_internal)
+					else
+						res_total = res_internal
+					end
+				}
 			end
 			res_total
 		end
@@ -1337,41 +1342,42 @@ module Vkontakte
 			end
 			
 			filenames.each do |filename|
-				
-				progress "Uploading #{filename} ..."  
-				#Asking for upload parameters and server
-				post = connect.post('/al_photos.php',{"__query" => "album#{user.id}_#{id}", "al" => "-1", "al_id" => user.id})
-				hash = post.scan(/hash[^\da-z]+([\da-z]+)/)[0][0]
-				rhash = post.scan(/rhash[^\da-z]+([\da-z]+)/)[0][0]
-				addr = post.scan(/flashLiteUrl\s*\=\s*([^\;]+)/)[0][0].gsub("\"",'').gsub("'",'').gsub("\\",'')
-				
-				params = {"oid" => user.id, "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "rhash" => rhash, "act" => "do_add", "ajx" => "1"}
-				res = nil
-				safe_file_name(filename) do |file_safe|
-					f = File.new(file_safe, "rb")
-					params["photo"] = f
-				
-					#Uploading photo
-					res = connect.post(addr,params)
-					f.close
-				end
-				
-				#Asking for photo parameters
-				hash = res.scan(/hash\=([^\&]+)/)[0][0]
-				photos = res.scan(/photos\=([^\&]+)/)[0][0]
-				server = res.scan(/server\=([^\&]+)/)[0][0]
-				
-				
-				params = {"photos" => photos,"server" => server,"from" => "html5","context" => "1", "al" => "1", "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "act" => "done_add"}
-				res = connect.post('/al_photos.php',params)
-				hash = res.scan(/deletePhoto[^\,]+\,\s*([^\)]+)/)[0][0].gsub("\"",'').gsub("'",'')
-				res_internal = Image.new.set(self,res.split("<!>").last.split("_").last,res.scan(/x_src\:\s*([^\,]+)/)[0][0].gsub("\"","").gsub("'",""),hash,true,connect)
-				if many
-					res_total.push(res_internal)
-				else
-					res_total = res_internal
-				end
-				progress :photo_uploaded,res_internal
+				safe{
+					progress "Uploading #{filename} ..."  
+					#Asking for upload parameters and server
+					post = connect.post('/al_photos.php',{"__query" => "album#{user.id}_#{id}", "al" => "-1", "al_id" => user.id})
+					hash = post.scan(/hash[^\da-z]+([\da-z]+)/)[0][0]
+					rhash = post.scan(/rhash[^\da-z]+([\da-z]+)/)[0][0]
+					addr = post.scan(/flashLiteUrl\s*\=\s*([^\;]+)/)[0][0].gsub("\"",'').gsub("'",'').gsub("\\",'')
+					
+					params = {"oid" => user.id, "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "rhash" => rhash, "act" => "do_add", "ajx" => "1"}
+					res = nil
+					safe_file_name(filename) do |file_safe|
+						f = File.new(file_safe, "rb")
+						params["photo"] = f
+					
+						#Uploading photo
+						res = connect.post(addr,params)
+						f.close
+					end
+					
+					#Asking for photo parameters
+					hash = res.scan(/hash\=([^\&]+)/)[0][0]
+					photos = res.scan(/photos\=([^\&]+)/)[0][0]
+					server = res.scan(/server\=([^\&]+)/)[0][0]
+					
+					
+					params = {"photos" => photos,"server" => server,"from" => "html5","context" => "1", "al" => "1", "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "act" => "done_add"}
+					res = connect.post('/al_photos.php',params)
+					hash = res.scan(/deletePhoto[^\,]+\,\s*([^\)]+)/)[0][0].gsub("\"",'').gsub("'",'')
+					res_internal = Image.new.set(self,res.split("<!>").last.split("_").last,res.scan(/x_src\:\s*([^\,]+)/)[0][0].gsub("\"","").gsub("'",""),hash,true,connect)
+					if many
+						res_total.push(res_internal)
+					else
+						res_total = res_internal
+					end
+					progress :photo_uploaded,res_internal
+				}
 			end
 			res_total
 		end
@@ -1497,14 +1503,16 @@ module Vkontakte
 			end
 			
 			users_array.each do |user_it|
-			if(@connect.last_user_mark_photo)
-				diff = Time.new - @connect.last_user_mark_photo
-				sleep(@@photo_mark_interval - diff) if(diff<@@photo_mark_interval)
-			end
-			progress "Marking #{user_it.to_s}..."
-			@connect.post('/al_photos.php', {"act" => "add_tag", "al" => "1", "hash" => hash_vk, "mid" => user_it.id, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
-			@connect.last_user_mark_photo = Time.new
-			progress :image_marked,user_it
+				safe{
+					if(@connect.last_user_mark_photo)
+						diff = Time.new - @connect.last_user_mark_photo
+						sleep(@@photo_mark_interval - diff) if(diff<@@photo_mark_interval)
+					end
+					progress "Marking #{user_it.to_s}..."
+					@connect.post('/al_photos.php', {"act" => "add_tag", "al" => "1", "hash" => hash_vk, "mid" => user_it.id, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
+					@connect.last_user_mark_photo = Time.new
+					progress :image_marked,user_it
+				}
 			end
 		end
 		
@@ -1521,12 +1529,14 @@ module Vkontakte
 				users_array = [users]
 			end
 			users_array.each do |user_it|
-				progress "Unmarking #{user_it.to_s}..."
-				next if tagged.class.name == "Array"
-				tag = tagged[user_it.id]
-				next unless tag
-				@connect.post('/al_photos.php', {"act" => "delete_tag", "al" => "1", "hash" => hash_vk, "tag" => tag, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
-				progress :image_unmarked,user_it
+				safe{
+					progress "Unmarking #{user_it.to_s}..."
+					next if tagged.class.name == "Array"
+					tag = tagged[user_it.id]
+					next unless tag
+					@connect.post('/al_photos.php', {"act" => "delete_tag", "al" => "1", "hash" => hash_vk, "tag" => tag, "photo" => "#{album.user.id}_#{id}", "x2" => "1.00000000000000", "x" => "0.00000000000000","y2" => "1.00000000000000", "y" => "0.00000000000000"})
+					progress :image_unmarked,user_it
+				}
 			end
 		end
 		

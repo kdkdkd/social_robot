@@ -6,22 +6,24 @@ friends = me.friends
 
 #Найти людей
 friends.each_with_index do |people,index| 
-	
-     #Найти первый альбом
-     avatar = people.avatar
+     
+     #Игнорируем ошибки	
+     safe{
+          #Найти первый альбом
+          avatar = people.avatar
 
-    #Копируем сообщение
-    message_actual = message.dup
+          #Копируем сообщение
+          message_actual = message.dup
 
-     #Заменяем имя на имя текущего пользователя
-     message_actual.gsub!("$Имя",people.firstname)
+          #Заменяем имя на имя текущего пользователя
+          message_actual.gsub!("$Имя",people.firstname)
 
-     #Заменяем полное имя
-     message_actual.gsub!("$ИмяФамилия",people.name)   
+          #Заменяем полное имя
+          message_actual.gsub!("$ИмяФамилия",people.name)   
 
-     #Комментируем фотографию
-     avatar.post(message_actual) if (avatar && avatar.open)
-
+          #Комментируем фотографию
+          avatar.post(message_actual) if (avatar && avatar.open)
+     }
      #Обновим прогресс бар
      total(index,friends.length)
 

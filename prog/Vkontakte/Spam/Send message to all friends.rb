@@ -36,7 +36,7 @@ friends.each_with_index do |friend,index|
    title_actual.gsub!("$ИмяФамилия",friend.name)
    
    #Шлем сообщение другу
-   friend.mail(message_actual,title_actual)
+   safe{friend.mail(message_actual,title_actual)}
 
    #Обновляем прогресс бар
    total(index,friends.length)

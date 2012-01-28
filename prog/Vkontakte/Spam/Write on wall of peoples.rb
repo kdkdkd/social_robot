@@ -17,11 +17,15 @@ peoples.each_with_index do |people,index|
    #Заменяем полное имя
    message_actual.gsub!("$ИмяФамилия",people.name)
 
-   #Шлем сообщение другу
-   post = people.post(message_actual)
+   #Избегаем ошибок
+   safe{
+         
+         #Шлем сообщение другу
+         post = people.post(message_actual)
 
-   #Ставим лайк
-   post.like if post
+         #Ставим лайк
+         post.like if post
+    }
 
    #Обновляем прогресс бар
    total(index,peoples.length)

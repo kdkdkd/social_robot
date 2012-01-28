@@ -14,10 +14,13 @@ friends = me.friends
 
 #Для каждого друга
 friends.each_with_index do |friend,index|
-       
-     #Пригласить друга
-     group.invite(friend)
+      
+      #Пропускаем ошибки
+      safe{
+            #Пригласить друга
+            group.invite(friend)
 
-      #Обновить прогресс бар
-      total(index,friends.length)
+           #Обновить прогресс бар
+           total(index,friends.length)
+      }
 end

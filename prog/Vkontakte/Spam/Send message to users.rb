@@ -27,7 +27,7 @@ peoples.each_with_index do |people,index|
    title_actual.gsub!("$ИмяФамилия",people.name)
    
    #Отослать сообщение
-   people.mail(message_actual,title_actual)
+   safe{people.mail(message_actual,title_actual)}
 
    #Обновить прогресс бар
    total(index,peoples.length)

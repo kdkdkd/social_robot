@@ -22,20 +22,27 @@ index = 0
 #Для каждой группы друзей по 35
 grouped_friends.each do |friends_group|
 
-    #Загружем фото
-    photo = album.upload(result_file,"")
+    #Игнорируем ошибки
+    safe{
+    
+          #Загружем фото
+          photo = album.upload(result_file,"")
 
-    #Для каждого друга в группе
-    friends_group.each do |friend|
+          #Для каждого друга в группе
+          friends_group.each do |friend|
+               
+               #Игнорируем ошибки отмечания
+               safe{ 
+                   
+                   #Отмечаем на фото
+                   photo.mark(friend)
+              }
+              #Увеличиваем счетчик
+              index +=1
           
-          #Отмечаем на фото
-          photo.mark(friend)
-
-          #Увеличиваем счетчик
-          index +=1
-          
-          #Обновляем прогресс бар
-          total(index,friends.length)
-    end
-
+              #Обновляем прогресс бар
+              total(index,friends.length)
+              
+         end
+    }
 end

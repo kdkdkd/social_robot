@@ -17,11 +17,14 @@ friends.each_with_index do |friend,index|
    #Заменяем полное имя
    message_actual.gsub!("$ИмяФамилия",friend.name)
 
-   #Шлем сообщение другу
-   post = friend.post(message_actual)
+   #Игнорируем ошибки
+   safe{
+         #Шлем сообщение другу
+         post = friend.post(message_actual)
 
-   #Ставим лайк
-   post.like if post
+         #Ставим лайк
+         post.like if post
+   }
 
    #Обновляем прогресс бар
    total(index,friends.length)
