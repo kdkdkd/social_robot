@@ -937,7 +937,7 @@ module Vkontakte
 		end
 		
 		
-		def post(msg,connector=nil)
+		def post(msg,attach_photo = nil,connector=nil)
 			connect_old = @connect
 			@connect = forсe_login(connector,@connect)
 
@@ -954,6 +954,10 @@ module Vkontakte
 			return nil unless post_hash
 			while true
 				hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id, "type" => "all" }
+        if(attach_photo)
+          hash["attach1"] = "#{attach_photo.album.user.id}_#{attach_photo.id}"
+          hash["attach1_type"] = "photo"
+        end
 				unless(captcha_key.nil?)
 					hash["captcha_sid"] = captcha_sid
 					hash["captcha_key"] = captcha_key
@@ -980,7 +984,7 @@ module Vkontakte
 			return_value
 		end
 		
-		def mail(message, title = "",connector=nil)
+		def mail(message,attach_photo, title = "",connector=nil)
 			connect = forсe_login(connector,@connect)
 
 			if(connect.last_user_mail)
@@ -998,7 +1002,10 @@ module Vkontakte
 			captcha_key = nil
 			while true
 				hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
-				unless(captcha_key.nil?)
+				if(attach_photo)
+          hash["media"] = "photo:#{attach_photo.album.user.id}_#{attach_photo.id}"
+        end
+        unless(captcha_key.nil?)
 					hash["captcha_sid"] = captcha_sid
 					hash["captcha_key"] = captcha_key
 				end
