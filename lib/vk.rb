@@ -643,7 +643,13 @@ module Vkontakte
 				return nil if id.nil?
 				return res
 			end
-		end
+    end
+
+    def users
+      res = []
+      res = User.force_all('', {"Группа"=>id})
+      res
+    end
 
 		def open
 			@open if @open != "unknown"
@@ -740,7 +746,11 @@ module Vkontakte
 			return @name if @name
 			info
 			@name
-		end
+    end
+
+    def name=(value)
+      @name = value
+    end
 
 		def online
 			return true if @me
@@ -1094,78 +1104,149 @@ module Vkontakte
 			@connect.post('/al_friends.php', {"act" => "remove", "al" => "1", "mid" => id, "hash" => friend_hash})
 			@connect = connect_old
 			progress :user_uninvite,self
+    end
+
+    def User.force_all(query = '', hash_qparams = {}, connector=nil)
+
+			res = User.all_offset(query,0,hash_qparams,connector)
+			sleep 1
+			from =  hash_qparams["От"] || 12
+			to =  hash_qparams["До"] || 80
+			progress "Searching users #{query} age #{from}-#{to} ..."
+			if(res[3].nil?)
+        return []
+      elsif(res[3] == 0)
+        sleep 1
+        return []
+      elsif(res[3]<1000 || from == to)
+				sleep 10
+        ret =  User.all(query, 1000, 0, hash_qparams)
+				return ret
+			end
+
+			split = (to - from) /2
+			hash1 = hash_qparams.clone
+			hash1["От"] = from
+			hash1["До"] = from + split
+			hash2 = hash_qparams.clone
+			hash2["От"] = from + split + 1
+			hash2["До"] = to
+			res1 = User.force_all(query,hash1,connector)
+			res2 = User.force_all(query,hash2,connector)
+			res1 + res2
+
 		end
 		
-		def User.all(query = '', size = 50, offset = 0, hash = {}, connector=nil)
+		def User.all(query = '', size = 50, offset = 0, hash_qparams = {}, connector=nil)
 			progress "Searching users #{query}..."
 			res_all = []
-			5.times do
+
 				index = offset
 				while true do
-					res = User.all_offset(query,index,hash,connector)
-					index += 20 if index==0
-					index += 20
+					res = User.all_offset(query,index,hash_qparams,connector)
+					sleep 0.3
+					progress "Searching users #{query} offset #{index}..."
+					json_has_more = res[1]
+					json_offset = res[2]
+					json_length = res[3]
+					res = res[0]
+					#index += 20 if index==0
+					#index += 20
+					index = json_offset
 
-					break if res.length == 0 || res_all.length>=size.to_i
+
 					res_all += res
+					if !json_has_more || res_all.length>=size.to_i
+						break
+					end
 				end
 				res_all = res_all[0,size] if(res_all.length>size)
 				return res_all if(res_all.length>0)
-			end
+
 			return res_all
 		end
 		
-		def User.one(query = '', offset = 0, hash = {}, connector=nil)
-			User.all_offset(query,offset,hash,connector)[0]
+		def User.one(query = '', offset = 0, hash_qparams = {}, connector=nil)
+			User.all_offset(query,offset,hash_qparams,connector)[0][0]
 		end
 		
 		
-		def User.all_offset(query = '', offset = 0, hash = {}, connector=nil)
+		def User.all_offset(query = '', offset = 0, hash_qparams = {}, connector=nil)
 			connect = forсe_login(connector)
 			return [] unless connect.login
 			
 			qhash = {'al' => '1', 'c[q]' => query, 'c[section]' => 'people', 'offset' => offset.to_s}
-			country_name = hash["Страна"]
+			country_name = hash_qparams["Страна"]
 			country = @@countries[country_name]
 			
 			qhash["c[country]"] = country if country
-			city = hash["Город"]
+			city = hash_qparams["Город"]
 			if(city && country)
 					res_city = connect.post('/select_ajax.php',{"act" => "a_get_cities", "country" => country.to_s, "str" => city},true)
 					city = res_city.scan(/\d+/)[0]
 					qhash["c[city]"] = city if city
 			end
 			
-			qhash["c[sex]"] = "2" if(hash["Пол"] == "Мужской")
-			qhash["c[sex]"] = "1" if(hash["Пол"] == "Женский")
+			qhash["c[sex]"] = "2" if(hash_qparams["Пол"] == "Мужской")
+			qhash["c[sex]"] = "1" if(hash_qparams["Пол"] == "Женский")
 
-			age_from = hash["От"]
+			age_from = hash_qparams["От"]
 			qhash["c[age_from]"] = age_from if age_from
 
-			age_to = hash["До"]
+			age_to = hash_qparams["До"]
 			qhash["c[age_to]"] = age_to if age_to
 
-			qhash["c[online]"] = "1" if(hash["Онлайн"] == "Да")
+			qhash["c[online]"] = "1" if(hash_qparams["Онлайн"] == "Да")
 
 
-			qhash["c[name]"] = (hash["По имени"] == "Да")? "1":"0"
-			qhash["c[sort]"] = "1" if (hash["По дате"] == "Да")
-
+			qhash["c[name]"] = (hash_qparams["По имени"] == "Да")? "1":"0"
+			qhash["c[sort]"] = "1" if (hash_qparams["По дате"] == "Да")
+			qhash["c[group]"] = (hash_qparams["Группа"]) if (hash_qparams["Группа"])
 			
-			res = connect.post('/al_search.php',qhash)
-			html_text = res.split("<!>").find{|x| x.index '<div'}
-			return [] unless html_text
-			html = Nokogiri::HTML(html_text)
-			res = []
-			html.xpath("//div[@class='info fl_l']").each do |human|
-				a = human.xpath(".//a")[0]
-				href = a["href"]
-				href = href.scan(/\/id(\d+)/)[0][0] if href =~ /\/id\d+/
-				href.gsub!("/","")
-				res.push(User.new.set(href,a.text,connect))
-			
-			end
-			res
+			res = nil
+			seconds_sleep = 50
+
+      while true
+        res = connect.post('/al_search.php',qhash)
+        json_valid = false
+        json_string = res.split("<!>").find{|x| x.index("<!json>")==0}
+
+        json = JSON.parse(json_string.gsub("<!json>",""))
+        json_has_more = json["has_more"]
+        json_offset = json["offset"]
+        json_length = nil
+        if(json["summary"])
+          json_length_string = json["summary"].gsub(/\<[^\>]+\>/,"").gsub(/[^\d]+/,'')
+          if (json_length_string.length != 0)
+            json_length = json_length_string.to_i
+            json_valid = true
+          end
+
+        end
+        res_array = []
+        if(offset>0 || json_valid)
+          html_text = res.split("<!>").find{|x| x.index '<div'}
+			    return [[],false,0,nil] unless html_text
+			    html = Nokogiri::HTML(html_text)
+
+			    html.xpath("//div[@class='info fl_l']").each do |human|
+				    a = human.xpath(".//a")[0]
+				    href = a["href"]
+				    href = href.scan(/\/id(\d+)/)[0][0] if href =~ /\/id\d+/
+				    href.gsub!("/","")
+				    res_array.push(User.new.set(href,a.text,connect))
+          end
+        end
+        if(res_array.length > 0)
+          return [res_array,json_has_more,json_offset,json_length]
+        end
+        return  [[],false,0,nil] if(seconds_sleep>1000)
+        sleep seconds_sleep
+        seconds_sleep *= 4
+      end
+
+
+
 		end
 		
 		def firstname

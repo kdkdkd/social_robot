@@ -1014,8 +1014,17 @@ class SocialRobot < Qt::MainWindow
 		search_results = agent.submit search_form
 		@anonymizer = "http://" + search_results.uri.host
 		force_location @anonymizer
+  end
+
+  def sub(original,friend)
+   message_actual = original.dup
+   message_actual.gsub!("$Имя",friend.firstname)
+   message_actual.gsub!("$ИмяФамилия",friend.name)
+   message_actual.gsub!(/\{([^\}]+)\}/)do |match|
+    match.gsub("{","").gsub("}","").split("|").sample
+   end
+   message_actual
 	end
-	
 	
 end
 
