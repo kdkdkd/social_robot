@@ -937,7 +937,7 @@ module Vkontakte
 		end
 		
 		
-		def post(msg,attach_photo = nil,connector=nil)
+		def post(msg, attach_photo = nil,connector=nil)
 			connect_old = @connect
 			@connect = forсe_login(connector,@connect)
 
@@ -984,7 +984,7 @@ module Vkontakte
 			return_value
 		end
 		
-		def mail(message,attach_photo, title = "",connector=nil)
+		def mail(message, attach_photo = nil, attach_video = nil, title = "",connector=nil)
 			connect = forсe_login(connector,@connect)
 
 			if(connect.last_user_mail)
@@ -1003,9 +1003,12 @@ module Vkontakte
 			while true
 				hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
 				if(attach_photo)
-          hash["media"] = "photo:#{attach_photo.album.user.id}_#{attach_photo.id}"
-        end
-        unless(captcha_key.nil?)
+					hash["media"] = "photo:#{attach_photo.album.user.id}_#{attach_photo.id}"
+				end
+				if(attach_video)
+					hash["video"] = "photo:#{attach_video}"
+				end
+				unless(captcha_key.nil?)
 					hash["captcha_sid"] = captcha_sid
 					hash["captcha_key"] = captcha_key
 				end
@@ -1015,6 +1018,7 @@ module Vkontakte
 				else
 					a = res.split("<!>")
 					captcha_sid = a[a.length-2]
+					break if captcha_sid.to_i < 100
 					captcha_key = connect.ask_captcha_internal(captcha_sid)
 				end
 			end
@@ -1090,6 +1094,7 @@ module Vkontakte
 				else
 					a = res.split("<!>")
 					captcha_sid = a[a.length-2]
+					break if captcha_sid.to_i < 100
 					captcha_key = @connect.ask_captcha_internal(captcha_sid)
 				end
 			end
@@ -1529,8 +1534,8 @@ module Vkontakte
 		
 		
 		def Image.parse(href)
-			href = href.split("?").first
-			id_complex = href.split("/photo").last
+			id_complex = href.scan(/photo\d+\_\d+/)[0]
+			id_complex = id_complex.gsub("photo","")
 			id_complex_split = id_complex.split("_")
 			connect = forсe_login(nil,nil)
 			resp = connect.post('/al_photos.php', {"act" => "show","al" => "1","photo" => id_complex})
