@@ -5,7 +5,73 @@ require 'net/http'
 require 'uri'
 
 module Vkontakte
+	
+	#make post on wall common for User and Group
+	module PostMaker
 
+		def post(msg, attach_photo = nil, attach_video = nil, attach_music = nil ,connector=nil)
+			connect_old = @connect
+			@connect = forсe_login(connector,@connect)
+
+			if(@connect.last_user_post)
+				diff = Time.new - @connect.last_user_post
+				sleep(Vkontakte::post_interval - diff) if(diff<Vkontakte::post_interval)
+			end
+
+			progress "Posting #{@id}..."
+			captcha_sid = nil
+			captcha_key = nil
+			@post_hash = nil
+			@info = nil
+			return nil unless post_hash
+			while true
+				hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id_to_post, "type" => "all" }
+				attach_number = 1
+				if(attach_photo)
+					hash["attach#{attach_number}"] = "#{attach_photo.album.user.id}_#{attach_photo.id}"
+					hash["attach#{attach_number}_type"] = "photo"
+					attach_number += 1
+				end
+				
+				if(attach_video)
+					hash["attach#{attach_number}"] = "#{attach_video.user.id}_#{attach_video.id}"
+					hash["attach#{attach_number}_type"] = "video"
+					attach_number += 1
+				end
+				
+				if(attach_music)
+					hash["attach#{attach_number}"] = "#{attach_music.owner.id}_#{attach_music.id}"
+					hash["attach#{attach_number}_type"] = "audio"
+				end
+				
+				unless(captcha_key.nil?)
+					hash["captcha_sid"] = captcha_sid
+					hash["captcha_key"] = captcha_key
+				end
+				res = @connect.post('/al_wall.php', hash)
+				if(res.index("<!json>"))
+					html_text = res.split("<!>").find{|x| x.index('"post_table"')}
+					return_value = Post.parse_html(Nokogiri::HTML(html_text.gsub("<!-- ->->","")),self,@connect)
+					break
+				else
+					a = res.split("<!>")
+					captcha_sid = a[a.length-2]
+					if captcha_sid.to_i < 100
+						return_value = nil
+						break
+					end
+					captcha_key = @connect.ask_captcha_internal(captcha_sid)
+				end
+			end
+			@connect.last_user_post = Time.new
+			@connect = connect_old
+			progress :user_post,self,return_value if return_value
+
+			return_value
+		end
+	
+	end
+	
 	@@countries = {"\u0423\u043A\u0440\u0430\u0438\u043D\u0430"=>2, "\u0410\u0432\u0441\u0442\u0440\u0430\u043B\u0438\u044F"=>19, "\u0410\u0432\u0441\u0442\u0440\u0438\u044F"=>20, "\u0410\u0437\u0435\u0440\u0431\u0430\u0439\u0434\u0436\u0430\u043D"=>5, "\u0410\u043B\u0431\u0430\u043D\u0438\u044F"=>21, "\u0410\u043B\u0436\u0438\u0440"=>22, "\u0410\u043C\u0435\u0440\u0438\u043A\u0430\u043D\u0441\u043A\u043E\u0435 \u0421\u0430\u043C\u043E\u0430"=>23, "\u0410\u043D\u0433\u0438\u043B\u044C\u044F"=>24, "\u0410\u043D\u0433\u043E\u043B\u0430"=>25, "\u0410\u043D\u0434\u043E\u0440\u0440\u0430"=>26, "\u0410\u043D\u0442\u0438\u0433\u0443\u0430 \u0438 \u0411\u0430\u0440\u0431\u0443\u0434\u0430"=>27, "\u0410\u0440\u0433\u0435\u043D\u0442\u0438\u043D\u0430"=>28, "\u0410\u0440\u043C\u0435\u043D\u0438\u044F"=>6, "\u0410\u0440\u0443\u0431\u0430"=>29, "\u0410\u0444\u0433\u0430\u043D\u0438\u0441\u0442\u0430\u043D"=>30, "\u0411\u0430\u0433\u0430\u043C\u044B"=>31, "\u0411\u0430\u043D\u0433\u043B\u0430\u0434\u0435\u0448"=>32, "\u0411\u0430\u0440\u0431\u0430\u0434\u043E\u0441"=>33, "\u0411\u0430\u0445\u0440\u0435\u0439\u043D"=>34, "\u0411\u0435\u043B\u0430\u0440\u0443\u0441\u044C"=>3, "\u0411\u0435\u043B\u0438\u0437"=>35, "\u0411\u0435\u043B\u044C\u0433\u0438\u044F"=>36, "\u0411\u0435\u043D\u0438\u043D"=>37, "\u0411\u0435\u0440\u043C\u0443\u0434\u044B"=>38, "\u0411\u043E\u043B\u0433\u0430\u0440\u0438\u044F"=>39, "\u0411\u043E\u043B\u0438\u0432\u0438\u044F"=>40, "\u0411\u043E\u0441\u043D\u0438\u044F \u0438 \u0413\u0435\u0440\u0446\u0435\u0433\u043E\u0432\u0438\u043D\u0430"=>41, "\u0411\u043E\u0442\u0441\u0432\u0430\u043D\u0430"=>42, "\u0411\u0440\u0430\u0437\u0438\u043B\u0438\u044F"=>43, "\u0411\u0440\u0443\u043D\u0435\u0439-\u0414\u0430\u0440\u0443\u0441\u0441\u0430\u043B\u0430\u043C"=>44, "\u0411\u0443\u0440\u043A\u0438\u043D\u0430-\u0424\u0430\u0441\u043E"=>45, "\u0411\u0443\u0440\u0443\u043D\u0434\u0438"=>46, "\u0411\u0443\u0442\u0430\u043D"=>47, "\u0412\u0430\u043D\u0443\u0430\u0442\u0443"=>48, "\u0412\u0435\u043B\u0438\u043A\u043E\u0431\u0440\u0438\u0442\u0430\u043D\u0438\u044F"=>49, "\u0412\u0435\u043D\u0433\u0440\u0438\u044F"=>50, "\u0412\u0435\u043D\u0435\u0441\u0443\u044D\u043B\u0430"=>51, "\u0412\u0438\u0440\u0433\u0438\u043D\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430, \u0411\u0440\u0438\u0442\u0430\u043D\u0441\u043A\u0438\u0435"=>52, "\u0412\u0438\u0440\u0433\u0438\u043D\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430, \u0421\u0428\u0410"=>53, "\u0412\u043E\u0441\u0442\u043E\u0447\u043D\u044B\u0439 \u0422\u0438\u043C\u043E\u0440"=>54, "\u0412\u044C\u0435\u0442\u043D\u0430\u043C"=>55, "\u0413\u0430\u0431\u043E\u043D"=>56, "\u0413\u0430\u0438\u0442\u0438"=>57, "\u0413\u0430\u0439\u0430\u043D\u0430"=>58, "\u0413\u0430\u043C\u0431\u0438\u044F"=>59, "\u0413\u0430\u043D\u0430"=>60, "\u0413\u0432\u0430\u0434\u0435\u043B\u0443\u043F\u0430"=>61, "\u0413\u0432\u0430\u0442\u0435\u043C\u0430\u043B\u0430"=>62, "\u0413\u0432\u0438\u043D\u0435\u044F"=>63, "\u0413\u0432\u0438\u043D\u0435\u044F-\u0411\u0438\u0441\u0430\u0443"=>64, "\u0413\u0435\u0440\u043C\u0430\u043D\u0438\u044F"=>65, "\u0413\u0438\u0431\u0440\u0430\u043B\u0442\u0430\u0440"=>66, "\u0413\u043E\u043D\u0434\u0443\u0440\u0430\u0441"=>67, "\u0413\u043E\u043D\u043A\u043E\u043D\u0433"=>68, "\u0413\u0440\u0435\u043D\u0430\u0434\u0430"=>69, "\u0413\u0440\u0435\u043D\u043B\u0430\u043D\u0434\u0438\u044F"=>70, "\u0413\u0440\u0435\u0446\u0438\u044F"=>71, "\u0413\u0440\u0443\u0437\u0438\u044F"=>7, "\u0413\u0443\u0430\u043C"=>72, "\u0414\u0430\u043D\u0438\u044F"=>73, "\u0414\u0436\u0438\u0431\u0443\u0442\u0438"=>231, "\u0414\u043E\u043C\u0438\u043D\u0438\u043A\u0430"=>74, "\u0414\u043E\u043C\u0438\u043D\u0438\u043A\u0430\u043D\u0441\u043A\u0430\u044F \u0420\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>75, "\u0415\u0433\u0438\u043F\u0435\u0442"=>76, "\u0417\u0430\u043C\u0431\u0438\u044F"=>77, "\u0417\u0430\u043F\u0430\u0434\u043D\u0430\u044F \u0421\u0430\u0445\u0430\u0440\u0430"=>78, "\u0417\u0438\u043C\u0431\u0430\u0431\u0432\u0435"=>79, "\u0418\u0437\u0440\u0430\u0438\u043B\u044C"=>8, "\u0418\u043D\u0434\u0438\u044F"=>80, "\u0418\u043D\u0434\u043E\u043D\u0435\u0437\u0438\u044F"=>81, "\u0418\u043E\u0440\u0434\u0430\u043D\u0438\u044F"=>82, "\u0418\u0440\u0430\u043A"=>83, "\u0418\u0440\u0430\u043D"=>84, "\u0418\u0440\u043B\u0430\u043D\u0434\u0438\u044F"=>85, "\u0418\u0441\u043B\u0430\u043D\u0434\u0438\u044F"=>86, "\u0418\u0441\u043F\u0430\u043D\u0438\u044F"=>87, "\u0418\u0442\u0430\u043B\u0438\u044F"=>88, "\u0419\u0435\u043C\u0435\u043D"=>89, "\u041A\u0430\u0431\u043E-\u0412\u0435\u0440\u0434\u0435"=>90, "\u041A\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043D"=>4, "\u041A\u0430\u043C\u0431\u043E\u0434\u0436\u0430"=>91, "\u041A\u0430\u043C\u0435\u0440\u0443\u043D"=>92, "\u041A\u0430\u043D\u0430\u0434\u0430"=>10, "\u041A\u0430\u0442\u0430\u0440"=>93, "\u041A\u0435\u043D\u0438\u044F"=>94, "\u041A\u0438\u043F\u0440"=>95, "\u041A\u0438\u0440\u0438\u0431\u0430\u0442\u0438"=>96, "\u041A\u0438\u0442\u0430\u0439"=>97, "\u041A\u043E\u043B\u0443\u043C\u0431\u0438\u044F"=>98, "\u041A\u043E\u043C\u043E\u0440\u044B"=>99, "\u041A\u043E\u043D\u0433\u043E"=>100, "\u041A\u043E\u043D\u0433\u043E, \u0434\u0435\u043C\u043E\u043A\u0440\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0430\u044F \u0440\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>101, "\u041A\u043E\u0441\u0442\u0430-\u0420\u0438\u043A\u0430"=>102, "\u041A\u043E\u0442 \u0434`\u0418\u0432\u0443\u0430\u0440"=>103, "\u041A\u0443\u0431\u0430"=>104, "\u041A\u0443\u0432\u0435\u0439\u0442"=>105, "\u041A\u044B\u0440\u0433\u044B\u0437\u0441\u0442\u0430\u043D"=>11, "\u041B\u0430\u043E\u0441"=>106, "\u041B\u0430\u0442\u0432\u0438\u044F"=>12, "\u041B\u0435\u0441\u043E\u0442\u043E"=>107, "\u041B\u0438\u0431\u0435\u0440\u0438\u044F"=>108, "\u041B\u0438\u0432\u0430\u043D"=>109, "\u041B\u0438\u0432\u0438\u0439\u0441\u043A\u0430\u044F \u0410\u0440\u0430\u0431\u0441\u043A\u0430\u044F \u0414\u0436\u0430\u043C\u0430\u0445\u0438\u0440\u0438\u044F"=>110, "\u041B\u0438\u0442\u0432\u0430"=>13, "\u041B\u0438\u0445\u0442\u0435\u043D\u0448\u0442\u0435\u0439\u043D"=>111, "\u041B\u044E\u043A\u0441\u0435\u043C\u0431\u0443\u0440\u0433"=>112, "\u041C\u0430\u0432\u0440\u0438\u043A\u0438\u0439"=>113, "\u041C\u0430\u0432\u0440\u0438\u0442\u0430\u043D\u0438\u044F"=>114, "\u041C\u0430\u0434\u0430\u0433\u0430\u0441\u043A\u0430\u0440"=>115, "\u041C\u0430\u043A\u0430\u043E"=>116, "\u041C\u0430\u043A\u0435\u0434\u043E\u043D\u0438\u044F"=>117, "\u041C\u0430\u043B\u0430\u0432\u0438"=>118, "\u041C\u0430\u043B\u0430\u0439\u0437\u0438\u044F"=>119, "\u041C\u0430\u043B\u0438"=>120, "\u041C\u0430\u043B\u044C\u0434\u0438\u0432\u044B"=>121, "\u041C\u0430\u043B\u044C\u0442\u0430"=>122, "\u041C\u0430\u0440\u043E\u043A\u043A\u043E"=>123, "\u041C\u0430\u0440\u0442\u0438\u043D\u0438\u043A\u0430"=>124, "\u041C\u0430\u0440\u0448\u0430\u043B\u043B\u043E\u0432\u044B \u041E\u0441\u0442\u0440\u043E\u0432\u0430"=>125, "\u041C\u0435\u043A\u0441\u0438\u043A\u0430"=>126, "\u041C\u0438\u043A\u0440\u043E\u043D\u0435\u0437\u0438\u044F, \u0444\u0435\u0434\u0435\u0440\u0430\u0442\u0438\u0432\u043D\u044B\u0435 \u0448\u0442\u0430\u0442\u044B"=>127, "\u041C\u043E\u0437\u0430\u043C\u0431\u0438\u043A"=>128, "\u041C\u043E\u043B\u0434\u043E\u0432\u0430"=>15, "\u041C\u043E\u043D\u0430\u043A\u043E"=>129, "\u041C\u043E\u043D\u0433\u043E\u043B\u0438\u044F"=>130, "\u041C\u043E\u043D\u0442\u0441\u0435\u0440\u0440\u0430\u0442"=>131, "\u041C\u044C\u044F\u043D\u043C\u0430"=>132, "\u041D\u0430\u043C\u0438\u0431\u0438\u044F"=>133, "\u041D\u0430\u0443\u0440\u0443"=>134, "\u041D\u0435\u043F\u0430\u043B"=>135, "\u041D\u0438\u0433\u0435\u0440"=>136, "\u041D\u0438\u0433\u0435\u0440\u0438\u044F"=>137, "\u041D\u0438\u0434\u0435\u0440\u043B\u0430\u043D\u0434\u0441\u043A\u0438\u0435 \u0410\u043D\u0442\u0438\u043B\u044B"=>138, "\u041D\u0438\u0434\u0435\u0440\u043B\u0430\u043D\u0434\u044B"=>139, "\u041D\u0438\u043A\u0430\u0440\u0430\u0433\u0443\u0430"=>140, "\u041D\u0438\u0443\u044D"=>141, "\u041D\u043E\u0432\u0430\u044F \u0417\u0435\u043B\u0430\u043D\u0434\u0438\u044F"=>142, "\u041D\u043E\u0432\u0430\u044F \u041A\u0430\u043B\u0435\u0434\u043E\u043D\u0438\u044F"=>143, "\u041D\u043E\u0440\u0432\u0435\u0433\u0438\u044F"=>144, "\u041E\u0431\u044A\u0435\u0434\u0438\u043D\u0435\u043D\u043D\u044B\u0435 \u0410\u0440\u0430\u0431\u0441\u043A\u0438\u0435 \u042D\u043C\u0438\u0440\u0430\u0442\u044B"=>145, "\u041E\u043C\u0430\u043D"=>146, "\u041E\u0441\u0442\u0440\u043E\u0432 \u041C\u044D\u043D"=>147, "\u041E\u0441\u0442\u0440\u043E\u0432 \u041D\u043E\u0440\u0444\u043E\u043B\u043A"=>148, "\u041E\u0441\u0442\u0440\u043E\u0432\u0430 \u041A\u0430\u0439\u043C\u0430\u043D"=>149, "\u041E\u0441\u0442\u0440\u043E\u0432\u0430 \u041A\u0443\u043A\u0430"=>150, "\u041E\u0441\u0442\u0440\u043E\u0432\u0430 \u0422\u0435\u0440\u043A\u0441 \u0438 \u041A\u0430\u0439\u043A\u043E\u0441"=>151, "\u041F\u0430\u043A\u0438\u0441\u0442\u0430\u043D"=>152, "\u041F\u0430\u043B\u0430\u0443"=>153, "\u041F\u0430\u043B\u0435\u0441\u0442\u0438\u043D\u0441\u043A\u0430\u044F \u0430\u0432\u0442\u043E\u043D\u043E\u043C\u0438\u044F"=>154, "\u041F\u0430\u043D\u0430\u043C\u0430"=>155, "\u041F\u0430\u043F\u0443\u0430 - \u041D\u043E\u0432\u0430\u044F \u0413\u0432\u0438\u043D\u0435\u044F"=>156, "\u041F\u0430\u0440\u0430\u0433\u0432\u0430\u0439"=>157, "\u041F\u0435\u0440\u0443"=>158, "\u041F\u0438\u0442\u043A\u0435\u0440\u043D"=>159, "\u041F\u043E\u043B\u044C\u0448\u0430"=>160, "\u041F\u043E\u0440\u0442\u0443\u0433\u0430\u043B\u0438\u044F"=>161, "\u041F\u0443\u044D\u0440\u0442\u043E-\u0420\u0438\u043A\u043E"=>162, "\u0420\u0435\u044E\u043D\u044C\u043E\u043D"=>163, "\u0420\u043E\u0441\u0441\u0438\u044F"=>1, "\u0420\u0443\u0430\u043D\u0434\u0430"=>164, "\u0420\u0443\u043C\u044B\u043D\u0438\u044F"=>165, "\u0421\u0428\u0410"=>9, "\u0421\u0430\u043B\u044C\u0432\u0430\u0434\u043E\u0440"=>166, "\u0421\u0430\u043C\u043E\u0430"=>167, "\u0421\u0430\u043D-\u041C\u0430\u0440\u0438\u043D\u043E"=>168, "\u0421\u0430\u043D-\u0422\u043E\u043C\u0435 \u0438 \u041F\u0440\u0438\u043D\u0441\u0438\u043F\u0438"=>169, "\u0421\u0430\u0443\u0434\u043E\u0432\u0441\u043A\u0430\u044F \u0410\u0440\u0430\u0432\u0438\u044F"=>170, "\u0421\u0432\u0430\u0437\u0438\u043B\u0435\u043D\u0434"=>171, "\u0421\u0432\u044F\u0442\u0430\u044F \u0415\u043B\u0435\u043D\u0430"=>172, "\u0421\u0435\u0432\u0435\u0440\u043D\u0430\u044F \u041A\u043E\u0440\u0435\u044F"=>173, "\u0421\u0435\u0432\u0435\u0440\u043D\u044B\u0435 \u041C\u0430\u0440\u0438\u0430\u043D\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430"=>174, "\u0421\u0435\u0439\u0448\u0435\u043B\u044B"=>175, "\u0421\u0435\u043D\u0435\u0433\u0430\u043B"=>176, "\u0421\u0435\u043D\u0442-\u0412\u0438\u043D\u0441\u0435\u043D\u0442"=>177, "\u0421\u0435\u043D\u0442-\u041A\u0438\u0442\u0441 \u0438 \u041D\u0435\u0432\u0438\u0441"=>178, "\u0421\u0435\u043D\u0442-\u041B\u044E\u0441\u0438\u044F"=>179, "\u0421\u0435\u043D\u0442-\u041F\u044C\u0435\u0440 \u0438 \u041C\u0438\u043A\u0435\u043B\u043E\u043D"=>180, "\u0421\u0435\u0440\u0431\u0438\u044F"=>181, "\u0421\u0438\u043D\u0433\u0430\u043F\u0443\u0440"=>182, "\u0421\u0438\u0440\u0438\u0439\u0441\u043A\u0430\u044F \u0410\u0440\u0430\u0431\u0441\u043A\u0430\u044F \u0420\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>183, "\u0421\u043B\u043E\u0432\u0430\u043A\u0438\u044F"=>184, "\u0421\u043B\u043E\u0432\u0435\u043D\u0438\u044F"=>185, "\u0421\u043E\u043B\u043E\u043C\u043E\u043D\u043E\u0432\u044B \u041E\u0441\u0442\u0440\u043E\u0432\u0430"=>186, "\u0421\u043E\u043C\u0430\u043B\u0438"=>187, "\u0421\u0443\u0434\u0430\u043D"=>188, "\u0421\u0443\u0440\u0438\u043D\u0430\u043C"=>189, "\u0421\u044C\u0435\u0440\u0440\u0430-\u041B\u0435\u043E\u043D\u0435"=>190, "\u0422\u0430\u0434\u0436\u0438\u043A\u0438\u0441\u0442\u0430\u043D"=>16, "\u0422\u0430\u0438\u043B\u0430\u043D\u0434"=>191, "\u0422\u0430\u0439\u0432\u0430\u043D\u044C"=>192, "\u0422\u0430\u043D\u0437\u0430\u043D\u0438\u044F"=>193, "\u0422\u043E\u0433\u043E"=>194, "\u0422\u043E\u043A\u0435\u043B\u0430\u0443"=>195, "\u0422\u043E\u043D\u0433\u0430"=>196, "\u0422\u0440\u0438\u043D\u0438\u0434\u0430\u0434 \u0438 \u0422\u043E\u0431\u0430\u0433\u043E"=>197, "\u0422\u0443\u0432\u0430\u043B\u0443"=>198, "\u0422\u0443\u043D\u0438\u0441"=>199, "\u0422\u0443\u0440\u043A\u043C\u0435\u043D\u0438\u044F"=>17, "\u0422\u0443\u0440\u0446\u0438\u044F"=>200, "\u0423\u0433\u0430\u043D\u0434\u0430"=>201, "\u0423\u0437\u0431\u0435\u043A\u0438\u0441\u0442\u0430\u043D"=>18, "\u0423\u043E\u043B\u043B\u0438\u0441 \u0438 \u0424\u0443\u0442\u0443\u043D\u0430"=>202, "\u0423\u0440\u0443\u0433\u0432\u0430\u0439"=>203, "\u0424\u0430\u0440\u0435\u0440\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430"=>204, "\u0424\u0438\u0434\u0436\u0438"=>205, "\u0424\u0438\u043B\u0438\u043F\u043F\u0438\u043D\u044B"=>206, "\u0424\u0438\u043D\u043B\u044F\u043D\u0434\u0438\u044F"=>207, "\u0424\u043E\u043B\u043A\u043B\u0435\u043D\u0434\u0441\u043A\u0438\u0435 \u043E\u0441\u0442\u0440\u043E\u0432\u0430"=>208, "\u0424\u0440\u0430\u043D\u0446\u0438\u044F"=>209, "\u0424\u0440\u0430\u043D\u0446\u0443\u0437\u0441\u043A\u0430\u044F \u0413\u0432\u0438\u0430\u043D\u0430"=>210, "\u0424\u0440\u0430\u043D\u0446\u0443\u0437\u0441\u043A\u0430\u044F \u041F\u043E\u043B\u0438\u043D\u0435\u0437\u0438\u044F"=>211, "\u0425\u043E\u0440\u0432\u0430\u0442\u0438\u044F"=>212, "\u0426\u0435\u043D\u0442\u0440\u0430\u043B\u044C\u043D\u043E-\u0410\u0444\u0440\u0438\u043A\u0430\u043D\u0441\u043A\u0430\u044F \u0420\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>213, "\u0427\u0430\u0434"=>214, "\u0427\u0435\u0440\u043D\u043E\u0433\u043E\u0440\u0438\u044F"=>230, "\u0427\u0435\u0445\u0438\u044F"=>215, "\u0427\u0438\u043B\u0438"=>216, "\u0428\u0432\u0435\u0439\u0446\u0430\u0440\u0438\u044F"=>217, "\u0428\u0432\u0435\u0446\u0438\u044F"=>218, "\u0428\u043F\u0438\u0446\u0431\u0435\u0440\u0433\u0435\u043D \u0438 \u042F\u043D \u041C\u0430\u0439\u0435\u043D"=>219, "\u0428\u0440\u0438-\u041B\u0430\u043D\u043A\u0430"=>220, "\u042D\u043A\u0432\u0430\u0434\u043E\u0440"=>221, "\u042D\u043A\u0432\u0430\u0442\u043E\u0440\u0438\u0430\u043B\u044C\u043D\u0430\u044F \u0413\u0432\u0438\u043D\u0435\u044F"=>222, "\u042D\u0440\u0438\u0442\u0440\u0435\u044F"=>223, "\u042D\u0441\u0442\u043E\u043D\u0438\u044F"=>14, "\u042D\u0444\u0438\u043E\u043F\u0438\u044F"=>224, "\u042E\u0436\u043D\u0430\u044F \u041A\u043E\u0440\u0435\u044F"=>226, "\u042E\u0436\u043D\u043E-\u0410\u0444\u0440\u0438\u043A\u0430\u043D\u0441\u043A\u0430\u044F \u0420\u0435\u0441\u043F\u0443\u0431\u043B\u0438\u043A\u0430"=>227, "\u042F\u043C\u0430\u0439\u043A\u0430"=>228, "\u042F\u043F\u043E\u043D\u0438\u044F"=>229}
 	def countries
 		@@countries
@@ -65,6 +131,10 @@ module Vkontakte
 	@@post_interval = 4
 	def post_interval=(value)
 		@@post_interval=value
+	end
+	
+	def post_interval
+		@@post_interval
 	end
 	
 	@@invite_interval = 8
@@ -554,6 +624,8 @@ module Vkontakte
 	class Group
 		attr_accessor :connect
 		
+		include Vkontakte::PostMaker
+		
 		def set(id,name=nil,connect=nil)
 			@id = id.to_s
 			@name = name
@@ -569,6 +641,11 @@ module Vkontakte
 			info
 			@id
 		end
+		
+		#used for PostMaker
+		def id_to_post
+			"-#{id}"
+		end
 
 		def Group.get_id_by_group_page(resp)
 			resp.scan(/\"group_id\"\:\"?([\d]*)?/)[0][0]
@@ -578,6 +655,12 @@ module Vkontakte
 			return @name if @name 
 			info
 			@name
+		end
+		
+		def post_hash
+			return @post_hash if @post_hash 
+			info
+			@post_hash
 		end
 	
 		def to_s
@@ -613,6 +696,7 @@ module Vkontakte
 				return
 			end
 			@open = resp.index("Открытая группа")
+			@post_hash = User.get_post_hash(resp)
 			begin
 				@group_hash = resp.scan(Regexp.new("#{@id}\,\s*\'([^\']*)\'"))[0][0]
 			rescue
@@ -643,13 +727,14 @@ module Vkontakte
 				return nil if id.nil?
 				return res
 			end
-    end
+		end
 
-    def users
-      res = []
-      res = User.force_all('', {"Группа"=>id})
-      res
-    end
+		def users
+			res = []
+			progress :search_users,self
+			res = User.force_all('', {"Группа"=>id})
+			res
+		end
 
 		def open
 			@open if @open != "unknown"
@@ -709,6 +794,9 @@ module Vkontakte
 	class User
 		attr_accessor :me, :connect
 		
+		include Vkontakte::PostMaker
+		
+		
 		def User.get_id_by_user_page(resp)
 			resp.scan(/\"user_id\"\:\"?([^\"]*)\"?/)[0][0]
 		end
@@ -729,6 +817,10 @@ module Vkontakte
 			info
 			@id
 		end
+		
+		def id_to_post
+			id
+		end
 
 
 		def avatar
@@ -746,11 +838,11 @@ module Vkontakte
 			return @name if @name
 			info
 			@name
-    end
+		end
 
-    def name=(value)
-      @name = value
-    end
+		def name=(value)
+			@name = value
+		end
 
 		def online
 			return true if @me
@@ -937,54 +1029,9 @@ module Vkontakte
 		end
 		
 		
-		def post(msg, attach_photo = nil,connector=nil)
-			connect_old = @connect
-			@connect = forсe_login(connector,@connect)
 
-			if(@connect.last_user_post)
-				diff = Time.new - @connect.last_user_post
-				sleep(@@post_interval - diff) if(diff<@@post_interval)
-			end
-
-			progress "Posting #{@id}..."
-			captcha_sid = nil
-			captcha_key = nil
-			@post_hash = nil
-			@info = nil
-			return nil unless post_hash
-			while true
-				hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id, "type" => "all" }
-        if(attach_photo)
-          hash["attach1"] = "#{attach_photo.album.user.id}_#{attach_photo.id}"
-          hash["attach1_type"] = "photo"
-        end
-				unless(captcha_key.nil?)
-					hash["captcha_sid"] = captcha_sid
-					hash["captcha_key"] = captcha_key
-				end
-				res = @connect.post('/al_wall.php', hash)
-				if(res.index("<!json>"))
-					html_text = res.split("<!>").find{|x| x.index('"post_table"')}
-					return_value = Post.parse_html(Nokogiri::HTML(html_text.gsub("<!-- ->->","")),self,@connect)
-					break
-				else
-					a = res.split("<!>")
-					captcha_sid = a[a.length-2]
-					if captcha_sid.to_i < 100
-						return_value = nil
-						break
-					end
-					captcha_key = @connect.ask_captcha_internal(captcha_sid)
-				end
-			end
-			@connect.last_user_post = Time.new
-			@connect = connect_old
-			progress :user_post,self,return_value if return_value
-
-			return_value
-		end
 		
-		def mail(message, attach_photo = nil, attach_video = nil, title = "",connector=nil)
+		def mail(message, attach_photo = nil, attach_video = nil, attach_music = nil, title = "",connector=nil)
 			connect = forсe_login(connector,@connect)
 
 			if(connect.last_user_mail)
@@ -1002,11 +1049,20 @@ module Vkontakte
 			captcha_key = nil
 			while true
 				hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
+				was_attach = false
 				if(attach_photo)
 					hash["media"] = "photo:#{attach_photo.album.user.id}_#{attach_photo.id}"
+					was_attach = true
 				end
 				if(attach_video)
-					hash["video"] = "photo:#{attach_video}"
+					hash["media"] += "," if was_attach
+					hash["media"] += "video:#{attach_video.user.id}_#{attach_video.id}"
+					was_attach = true
+				end
+				if(attach_music)
+					hash["media"] += "," if was_attach
+					hash["media"] += "audio:#{attach_music.owner.id}_#{attach_music.id}"
+					was_attach = true
 				end
 				unless(captcha_key.nil?)
 					hash["captcha_sid"] = captcha_sid
@@ -1094,7 +1150,10 @@ module Vkontakte
 				else
 					a = res.split("<!>")
 					captcha_sid = a[a.length-2]
-					break if captcha_sid.to_i < 100
+					if captcha_sid.to_i < 100
+						@connect = connect_old
+						progress :warning_invite,self
+					end
 					captcha_key = @connect.ask_captcha_internal(captcha_sid)
 				end
 			end
@@ -1116,9 +1175,9 @@ module Vkontakte
 			@connect.post('/al_friends.php', {"act" => "remove", "al" => "1", "mid" => id, "hash" => friend_hash})
 			@connect = connect_old
 			progress :user_uninvite,self
-    end
+		end
 
-    def User.force_all(query = '', hash_qparams = {}, connector=nil)
+		def User.force_all(query = '', hash_qparams = {}, connector=nil)
 
 			res = User.all_offset(query,0,hash_qparams,connector)
 			sleep 1
@@ -1126,13 +1185,13 @@ module Vkontakte
 			to =  hash_qparams["До"] || 80
 			progress "Searching users #{query} age #{from}-#{to} ..."
 			if(res[3].nil?)
-        return []
-      elsif(res[3] == 0)
-        sleep 1
-        return []
-      elsif(res[3]<1000 || from == to)
+				return []
+			elsif(res[3] == 0)
+				sleep 1
+				return []
+			elsif(res[3]<1000 || from == to)
 				sleep 10
-        ret =  User.all(query, 1000, 0, hash_qparams)
+				ret =  User.all(query, 1000, 0, hash_qparams)
 				return ret
 			end
 
@@ -1218,47 +1277,43 @@ module Vkontakte
 			res = nil
 			seconds_sleep = 50
 
-      while true
-        res = connect.post('/al_search.php',qhash)
-        json_valid = false
-        json_string = res.split("<!>").find{|x| x.index("<!json>")==0}
+			while true
+				res = connect.post('/al_search.php',qhash)
+				json_valid = false
+				json_string = res.split("<!>").find{|x| x.index("<!json>")==0}
 
-        json = JSON.parse(json_string.gsub("<!json>",""))
-        json_has_more = json["has_more"]
-        json_offset = json["offset"]
-        json_length = nil
-        if(json["summary"])
-          json_length_string = json["summary"].gsub(/\<[^\>]+\>/,"").gsub(/[^\d]+/,'')
-          if (json_length_string.length != 0)
-            json_length = json_length_string.to_i
-            json_valid = true
-          end
+				json = JSON.parse(json_string.gsub("<!json>",""))
+				json_has_more = json["has_more"]
+				json_offset = json["offset"]
+				json_length = nil
+				if(json["summary"])
+					json_length_string = json["summary"].gsub(/\<[^\>]+\>/,"").gsub(/[^\d]+/,'')
+					if (json_length_string.length != 0)
+						json_length = json_length_string.to_i
+						json_valid = true
+					end
+				end
+				res_array = []
+				if(offset>0 || json_valid)
+					html_text = res.split("<!>").find{|x| x.index '<div'}
+					return [[],false,0,nil] unless html_text
+					html = Nokogiri::HTML(html_text)
 
-        end
-        res_array = []
-        if(offset>0 || json_valid)
-          html_text = res.split("<!>").find{|x| x.index '<div'}
-			    return [[],false,0,nil] unless html_text
-			    html = Nokogiri::HTML(html_text)
-
-			    html.xpath("//div[@class='info fl_l']").each do |human|
-				    a = human.xpath(".//a")[0]
-				    href = a["href"]
-				    href = href.scan(/\/id(\d+)/)[0][0] if href =~ /\/id\d+/
-				    href.gsub!("/","")
-				    res_array.push(User.new.set(href,a.text,connect))
-          end
-        end
-        if(res_array.length > 0)
-          return [res_array,json_has_more,json_offset,json_length]
-        end
-        return  [[],false,0,nil] if(seconds_sleep>1000)
-        sleep seconds_sleep
-        seconds_sleep *= 4
-      end
-
-
-
+					html.xpath("//div[@class='info fl_l']").each do |human|
+						a = human.xpath(".//a")[0]
+						href = a["href"]
+						href = href.scan(/\/id(\d+)/)[0][0] if href =~ /\/id\d+/
+						href.gsub!("/","")
+						res_array.push(User.new.set(href,a.text,connect))
+					end
+				end
+				if(res_array.length > 0)
+					return [res_array,json_has_more,json_offset,json_length]
+				end
+				return  [[],false,0,nil] if(seconds_sleep>1000)
+				sleep seconds_sleep
+				seconds_sleep *= 4
+			end
 		end
 		
 		def firstname
@@ -1677,6 +1732,8 @@ module Vkontakte
 			
 			while true
 				hash = {"act" => "post_comment", "al" => "1","fromview"=>"1","hash"=>hash_current,"comment"=>message,"photo" => "#{album.user.id}_#{id}"}
+				
+				
 				unless(captcha_key.nil?)
 					hash["captcha_sid"] = captcha_sid
 					hash["captcha_key"] = captcha_key
@@ -1720,5 +1777,22 @@ module Vkontakte
 		
 	end
 
-
+	class Video
+		attr_accessor :id, :user
+		def Video.parse(href)
+			id_complex = href.scan(/video\d+\_\d+/)[0]
+			id_complex = id_complex.gsub("video","")
+			id_complex_split = id_complex.split("_")
+			res_video = Video.new
+			res_video.id = id_complex_split[1]
+			res_video.user = User.id(id_complex_split[0])
+			res_video
+			
+		end
+		
+	end
+	
+	
+	
+	
 end

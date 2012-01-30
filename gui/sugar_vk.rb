@@ -346,6 +346,14 @@ module Vkontakte
 	    end
 	end
 	
+	class Video
+		def pretty_string
+			res = "<img src = 'images/video.png'/>#{@id}"
+			res.print_indentation = print_indentation
+			res.pretty_string
+	    end
+	end
+	
 end
 
 

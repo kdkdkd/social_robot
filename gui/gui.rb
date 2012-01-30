@@ -1016,14 +1016,18 @@ class SocialRobot < Qt::MainWindow
 		force_location @anonymizer
   end
 
-  def sub(original,friend)
-   message_actual = original.dup
-   message_actual.gsub!("$Имя",friend.firstname)
-   message_actual.gsub!("$ИмяФамилия",friend.name)
-   message_actual.gsub!(/\{([^\}]+)\}/)do |match|
-    match.gsub("{","").gsub("}","").split("|").sample
-   end
-   message_actual
+	def sub(original,friend)
+		message_actual = original.dup
+		message_actual.gsub!("$Имя",friend.firstname)
+		message_actual.gsub!("$ИмяФамилия",friend.name)
+		message_actual.gsub!(/\{([^\}]+)\}/)do |match|
+			match.gsub("{","").gsub("}","").split("|").sample
+		end
+		message_actual
+	end
+	
+	def aviable_text_features
+		"$Имя - имя пользователя\n$ИмяФамилия - Имя и фамилия пользователя\n{привет|здорово|хай} - теги"
 	end
 	
 end

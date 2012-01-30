@@ -1,4 +1,4 @@
-message = ask_text("Сообщение.\n$Имя будет заменено на имя пользователя.\n$ИмяФамилия на полное имя.")
+message = ask_text("Сообщение.\n#{aviable_text_features}")
 
 #Найти друзей
 friends = me.friends
@@ -8,13 +8,7 @@ friends = me.friends
 friends.each_with_index do |people,index| 
 
      #Копируем сообщение
-     message_actual = message.dup
-
-     #Заменяем имя на имя текущего пользователя
-     message_actual.gsub!("$Имя",people.firstname)
-
-     #Заменяем полное имя
-     message_actual.gsub!("$ИмяФамилия",people.name)   
+     message_actual = sub(message,people)
 
      #Находим фото, открытое для комментирования
      open_photo = nil

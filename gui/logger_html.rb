@@ -36,6 +36,8 @@
 	 
 	 when :exception_antigate then res = "Ошибка с сервисом antigat.com: #{args[1].message}"
 	 when :exception then res = "Ошибка : <font color='red' size='3'>#{args[1].message}</font><br/>#{args[1].backtrace.map{|x| "<font color='grey' size='2'>" + x + "</font>"}.join("<br/>")}"
+	 when :warning_invite then res = "Пердупреждение : количество на сегодня приглашений исчерпано"
+	 when :search_users then res = "Запущен поиск по группе #{args[1].pretty_string}, это может занять довольно долгое время..."
    end
    res.to_s
 end
