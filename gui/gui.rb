@@ -667,6 +667,16 @@ class SocialRobot < Qt::MainWindow
 				else
 					force_location
 				end
+				
+				
+				if(Settings["use_proxy"] == "true")
+					Vkontakte::use_proxy = true
+					proxy_list = []
+					Settings["proxy_list"].to_s.each_line{|line| l = line.gsub(/\s/,"");proxy_list.push(l.split(":"))}
+					Vkontakte::proxy_list = proxy_list
+				else
+					Vkontakte::use_proxy = false
+				end
 				Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
 				Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
 				Vkontakte.like_interval = Settings["like_interval"].to_f
