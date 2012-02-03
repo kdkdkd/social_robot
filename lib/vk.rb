@@ -4,6 +4,8 @@ require 'json'
 require 'net/http'
 require 'uri'
 
+
+
 module Vkontakte
 	
 	#make post on wall common for User and Group
@@ -71,6 +73,8 @@ module Vkontakte
 		end
 	
 	end
+	
+	@@utf_converter = UtfToWin.new
 	
 	@@proxy_list = []
 	def proxy_list=(value)
@@ -546,10 +550,13 @@ module Vkontakte
       vkcom = @agent.get(addr("/")).body
       ip_h = vkcom.scan(/ip_h\s*:\s*\"?\'?([^\"\']+)\"?\'/)[0][0]
 
+	  
+	  
+	  
       #send to login.vk.com
       @agent.get("https://login.vk.com",{"act"=>"login","success_url"=>"","fail_url"=>"","try_to_login"=>"1",
       "to"=>"","vk"=>"1","al_test"=>"3","from_host"=>"vk.com","from_protocol"=>"http","ip_h"=>ip_h,
-      "email"=> @login,"pass"=> @password,"expire"=>""
+      "email"=> @login,"pass"=> @@utf_converter.encode(@password),"expire"=>""
       })
         @last_user_login_date = Time.new
 
@@ -1463,7 +1470,17 @@ module Vkontakte
 			res.uniq!
 			res
 		
-		end
+    end
+
+    def balance
+         return false unless @connect.login
+         res_post = @connect.post("/al_gifts.php",{"act"=>"get_money","al"=>"1"})
+         html_text = res_post.split("<!>").find{|x| x.index("<div")}
+         html = Nokogiri::HTML(html_text)
+         text = html.xpath("//div[@class = 'payments_summary_cont']").text
+         text.to_i
+    end
+
 		
 	end
 

@@ -1,6 +1,7 @@
 ﻿$:.unshift File.dirname($0)
 
 require 'Qt'
+require '../lib/utfto1251.rb'
 require '../lib/vk.rb'
 require '../lib/captcha.rb'
 require './sugar_vk.rb'
@@ -14,6 +15,8 @@ require 'zip/zipfilesystem'
 
 require './data.rb'
 require './table.rb'
+require './table.rb'
+
 include Vkontakte
 
 
