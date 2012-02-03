@@ -35,9 +35,13 @@
 	 
 	 
 	 when :exception_antigate then res = "Ошибка с сервисом antigat.com: #{args[1].message}"
-	 when :exception then res = "Ошибка : <font color='red' size='3'>#{args[1].message}</font><br/>#{args[1].backtrace.map{|x| "<font color='grey' size='2'>" + x + "</font>"}.join("<br/>")}"
-	 when :warning_invite then res = "Пердупреждение : количество на сегодня приглашений исчерпано"
-	 when :search_users then res = "Запущен поиск по группе #{args[1].pretty_string}, это может занять довольно долгое время..."
+	 when :exception then res = "Error : <font color='red' size='3'>#{args[1].message}</font><br/>#{args[1].backtrace.map{|x| "<font color='grey' size='2'>" + x + "</font>"}.join("<br/>")}"
+	 when :warning_invite then res = "Предупреждение : количество на сегодня приглашений исчерпано"
+   when :search_users then res = "Запущен поиск по группе #{args[1].pretty_string}, это может занять довольно долгое время..."
+   when :try_proxy then res = "Пробую прокси #{args[1]}"
+   when :ok_proxy then res = "Прокси подходит #{args[1]}"
+   when :bad_proxy then res = "Прокси не подходит #{args[1]}"
+   when :need_phone then res = "Нужен телефон"
    end
    res.to_s
 end

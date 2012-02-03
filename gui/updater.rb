@@ -2,10 +2,7 @@ class Updater
 	def last_version
 		return @last_version if @last_version
 		@last_version = Mechanize.new.get("https://raw.github.com/kdkdkd/social_robot/master/version.txt").body
-    begin
-      Mechanize.new.get("https://github.com/downloads/kdkdkd/social_robot/version.txt")
-    rescue
-    end
+    
 		@last_version
 	end
 	def current_version
@@ -13,6 +10,10 @@ class Updater
 	end
 	def update
 		return if current_version == last_version
+		begin
+			Mechanize.new.get("https://github.com/downloads/kdkdkd/social_robot/version.txt")
+		rescue
+		end
 		new_dir = "../../#{last_version}"
 		#Clean old
 		FileUtils.rm_rf new_dir if File.exists?(new_dir) && File.directory?(new_dir)
@@ -38,6 +39,6 @@ class Updater
 		File.open("../../versionstart.txt","w") do |versionstart|
 			versionstart<<last_version
 		end
-		
+		last_version
 	end
 end

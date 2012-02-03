@@ -77,7 +77,17 @@ module Vkontakte
 		@@proxy_list=value
 	end
 	
-	@@use_proxy = []
+	@@user_list = []
+	def user_list=(value)
+		@@user_list=value
+	end
+	
+	def user_list
+		@@user_list
+	end
+	
+	
+	@@use_proxy = nil
 	def use_proxy=(value)
 		@@use_proxy=value
 	end
@@ -113,12 +123,23 @@ module Vkontakte
 		@@failed_block = block if block
 		@@failed_block.call(*args) if defined?(@@failed_block) && args.length>0
 	end
+	
+	
+	def update_session(*args, &block)
+		@@update_session = block if block
+		@@update_session.call(*args) if defined?(@@update_session) && args.length>0
+	end
 
 	@@user_fetch_interval = 2.1
 	def user_fetch_interval=(value)
 		@@user_fetch_interval=value
-	end
-	
+  end
+
+  @@user_login_interval = 4
+  def user_login_interval=(value)
+      @@user_login_interval=value
+  end
+
 	@@transform_captcha = false
 	def transform_captcha=(value)
 		@@transform_captcha=value
@@ -133,6 +154,7 @@ module Vkontakte
 	def like_interval=(value)
 		@@like_interval=value
 	end
+	
 	@@mail_interval = 3
 	def mail_interval=(value)
 		@@mail_interval=value
@@ -172,22 +194,17 @@ module Vkontakte
 		@@ask_captcha_block.call args[0] if args.length>0 && @@ask_captcha_block
 	end
 	
+	@@main_user = nil 
+	def main_user=(value)
+		@@main_user=value
+	end
+	
 	#Ask user to login
 	def ask_login(*args, &block)
 		if block
 			@@ask_login_block = block 
 		else
 			@@ask_login_block.call if @@ask_login_block
-		end
-	end
-	
-	
-	#Ask user to login
-	def ask_phone(*args, &block)
-		if block
-			@@ask_phone_block = block 
-		else
-			@@ask_phone_block.call(*args) if @@ask_phone_block
 		end
 	end
 	
@@ -199,11 +216,7 @@ module Vkontakte
 		elsif !self_connect.nil?
 			connect = self_connect
 		else
-			connect = Vkontakte::last_connect
-		end
-		unless connect && connect.login
-			ask_login 
-			connect = Vkontakte::last_connect
+			connect = ask_login
 		end
 		connect
 	end
@@ -222,24 +235,11 @@ module Vkontakte
 		File.join(Vkontakte::application_directory,"loot")
 	end
 	
-	def session_file
-		File.join(Vkontakte::application_directory,"session","session.txt")
-	end
-	
 	def convert_exe
 		File.join(Vkontakte::application_directory,"magick","convert.exe")
 	end
 	
-	def last_connect=(val)
-		@@last_connect=val
-	end
 	
-	def last_connect
-		@@last_connect
-	end
-	
-	@@last_connect = nil
-
 	#Used to upload files with non latin file names
 	def safe_file_name(filename)
 		basename = File.basename(filename)
@@ -270,37 +270,50 @@ module Vkontakte
 			@cookie_login
 		end
 		
-		def initialize(login = nil, password = nil)
-			@agent = Mechanize.new { |agent|  agent.user_agent_alias = 'Mac Safari'	}
+		def login_from_cookie(cookie)
+			@cookie_login = Mechanize::Cookie.new("remixsid", cookie)
+			@cookie_login.domain = ".vk.com"
+			@cookie_login.path = "/"
+			check_login
+		end
+		
+		def new_agent
+      @agent = Mechanize.new { |agent|  agent.user_agent_alias = 'Mac Safari'	}
 			@agent.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 			@agent.agent.http.retry_change_requests = true
-			puts "use proxy = #{@@use_proxy}"
+    end
+
+		def initialize(login = nil, password = nil)
+			 new_agent
+			
 			if(@@use_proxy)
-				current_proxy = @@proxy_list.sample
-				if current_proxy
-					puts "set proxy #{current_proxy}"
-					@agent.set_proxy(current_proxy[0], current_proxy[1].to_i) 
-					
+			    found_proxy = false
+				proxy_list_small = @@proxy_list
+				while(!found_proxy)
+					current_proxy = proxy_list_small.sample
+          progress :try_proxy,current_proxy[0]
+					if current_proxy
+						begin
+							@agent.set_proxy(current_proxy[0], current_proxy[1].to_i, current_proxy[2], current_proxy[3])
+							@agent.get(addr("/"))
+							found_proxy = true
+              progress :ok_proxy,current_proxy[0]
+						rescue
+							proxy_list_small.delete(current_proxy)
+              progress :bad_proxy,current_proxy[0]
+              new_agent
+						end
+					else
+						new_agent
+						break
+					end
 				end
 			end
 			
 			@login = login
 			@password = password
-			Vkontakte::last_connect = self
 		end
 		
-		#Restore cookie from file
-		def restore_from_session
-			begin
-				cookie_value = IO.read(session_file)	
-				@cookie_login = Mechanize::Cookie.new("remixsid", cookie_value)
-				@cookie_login.domain = ".vk.com"
-				@cookie_login.path = "/"
-				return true
-			rescue
-				return false
-			end
-		end
 		
 		#Check if connection is ok
 		def check_login
@@ -440,15 +453,17 @@ module Vkontakte
 			resp
 		end
 		
-		#Save cookie to file
-		def save_cookie
-			File.open(Vkontakte::session_file,"w"){|f|f<<@cookie_login.value}
-		end
 		
 		#login with given login and password
 		def login
 			return true if @cookie_login
-			progress "Logging in..."
+
+      if(@last_user_fetch_date)
+				diff = Time.new - @last_user_fetch_date
+				sleep(@@user_fetch_interval - diff) if(diff<@@user_fetch_interval)
+			end
+
+      progress "Logging in..."
 
 			#check captcha
 			login_hash = {'op'=>'a_login_attempt','login' => @login}
@@ -467,20 +482,23 @@ module Vkontakte
 				end
 			end
 			
-			progress "Logging in..."
-			@agent.get(addr("/")) do |login_page|
+				progress "Logging in..."
+				@agent.get(addr("/")) do |login_page|
 				login_result = login_page.form_with(:name => 'login') do |login|
 					login.pass = @password
 					login.email = @login
 				end.submit
-				 
+
+        @cookie_login = @agent.cookies.dup
+        was_remixsid = nil
 				@agent.cookies.each do |cookie|
-					@cookie_login = cookie if cookie.name == "remixsid"
+					was_remixsid = cookie if cookie.name == "remixsid"
 				end
-				if @cookie_login
+
+				if was_remixsid
 					id = check_login
 					if(id)
-						save_cookie
+						update_session(@login,@cookie_login.value)
 						progress "Done login"
 						@uid = id
 						return id
@@ -494,6 +512,83 @@ module Vkontakte
 					return false
 				end
 			end
+    end
+
+    def login
+      return true if @cookie_login
+			progress "Logging in..."
+
+      if(@last_user_login_date)
+				diff = Time.new - @last_user_fetch_date
+				sleep(@@user_login_interval - diff) if(diff<@@user_login_interval)
+			end
+
+      #check captcha
+			login_hash = {'op'=>'a_login_attempt','login' => @login}
+			captcha_sid = nil
+			captcha_key = nil
+			while true
+				login_hash["captcha_sid"] = captcha_sid if captcha_sid
+				login_hash["captcha_key"] = captcha_key if captcha_key
+				a_login_attempt = @agent.post(addr('/login.php'),login_hash)
+				login_attempt_captcha = a_login_attempt.body.scan(/\"captcha\_sid\"\:\"([^\"]+)\"/)[0]
+				if(login_attempt_captcha)
+					captcha_sid = login_attempt_captcha[0]
+					captcha_key = ask_captcha_internal(captcha_sid)
+				else
+					break
+				end
+			end
+
+
+      #get ip_h
+      vkcom = @agent.get(addr("/")).body
+      ip_h = vkcom.scan(/ip_h\s*:\s*\"?\'?([^\"\']+)\"?\'/)[0][0]
+
+      #send to login.vk.com
+      @agent.get("https://login.vk.com",{"act"=>"login","success_url"=>"","fail_url"=>"","try_to_login"=>"1",
+      "to"=>"","vk"=>"1","al_test"=>"3","from_host"=>"vk.com","from_protocol"=>"http","ip_h"=>ip_h,
+      "email"=> @login,"pass"=> @password,"expire"=>""
+      })
+        @last_user_login_date = Time.new
+
+        @agent.cookies.each do |cookie|
+					@cookie_login = cookie if cookie.name == "remixsid"
+				end
+
+				if @cookie_login
+					id = check_login
+					if(id)
+						update_session(@login,@cookie_login.value)
+						progress "Done login"
+						@uid = id
+
+						return id
+					else
+						progress :need_phone,self
+						progress "Failed"
+
+						return false
+					end
+				else
+					progress "Failed"
+
+					return nil
+				end
+
+    end
+
+		
+		def Connect.login?(email,password)
+			progress "Get sid..."
+			res = nil
+			begin
+				res = Mechanize.new.post("http://login.userapi.com/auth",{"site" => "2" , "id" => "0" , "fccode" => "0", "fcsid" => "0","login" => "force", "email" => email, "pass" => password }).uri.to_s.scan(/sid\=([^\&]+)/)[0][0]
+				res = nil if(res.match(/^\-/))
+			rescue
+				res = nil
+			end
+			res
 		end
 		
 		
@@ -896,7 +991,7 @@ module Vkontakte
 		def set(id,name=nil,connect=nil)
 			@id = id.to_s
 			@name = name
-			@connect = (connect)? connect:Vkontakte::last_connect
+			@connect = (connect)
 			@me = false
 			self
 		end
@@ -907,29 +1002,34 @@ module Vkontakte
 			res
 		end
 		
-		def User.login(login,pass)
-			User.new.login(login,pass)
+		def User.login(login,pass,hash = nil)
+			User.new.login(login,pass,hash)
 		end
 		
 		#login with current login and password
-		def login(login,pass)
-			@connect = Connect.new(login,pass)
-			@id = @connect.login
-			return nil unless @id
-			@me = true
+		def login(login,pass,hash = nil)
+			
+			#login_from_session_ok = false
+			#if (!hash.nil? && hash.length>0)
+			#	@connect = Connect.new
+			#	@id = @connect.login_from_cookie(hash)
+			#	if(!@id)
+			#		@connect = nil
+			#	else
+			#		login_from_session_ok = true
+			#		@me = true
+			#	end
+			#end
+			#unless(login_from_session_ok)
+				@connect = Connect.new(login,pass)
+				@id = @connect.login
+				return @id unless @id
+				@me = true
+			#end
+
 			self
 		end
 		
-		#login with cookie stored in session file
-		def login_from_session()
-			@connect = Connect.new
-			return nil unless @connect.restore_from_session
-			@id = @connect.check_login
-			return nil unless @id
-			@me = true
-			self
-		end
-
 		def to_s
 			(@name)? "#{@name}(#{@id})" : "#{@id}"
 		end
@@ -965,6 +1065,7 @@ module Vkontakte
 		
 		def info
 			return @info if @info
+			return false unless @connect.login
 			return {} unless @connect.login
 			progress "Fetching user info #{@id} ..."
 			
@@ -1047,8 +1148,6 @@ module Vkontakte
 			end
 			total_res
 		end
-		
-		
 
 		
 		def mail(message, attach_photo = nil, attach_video = nil, attach_music = nil, title = "",connector=nil)

@@ -11,6 +11,9 @@ require './settings.rb'
 require './updater.rb'
 require './logger_html.rb'
 require 'zip/zipfilesystem'
+
+require './data.rb'
+require './table.rb'
 include Vkontakte
 
 
@@ -18,6 +21,7 @@ Vkontakte::application_directory = File.expand_path("../..")
 
 
 $mutex = Mutex.new
+$db = nil
 
 $app = Qt::Application.new(ARGV)
 
@@ -36,7 +40,7 @@ end
 	
 
 class SocialRobot < Qt::MainWindow
-	slots    'enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()', 'kill_session()'
+	slots    'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
 
 	#Create gui and set timer
 	def initialize()
@@ -57,10 +61,23 @@ class SocialRobot < Qt::MainWindow
 		@log_edit.openLinks = false
 
 
+		
 		@progress = Qt::ProgressBar.new
+		
+		@name_login_choose = Qt::ComboBox.new
+		@name_login_text = Qt::Label.new
+		@name_login_text.text = "Кем выполнять действие"
+		update_name_login_choose()
+		
+		
+		
 		@progress_text = Qt::Label.new
 		@progress_text.text = ""
 
+		statusBar().insertPermanentWidget(1,@name_login_choose,0)
+		statusBar().insertPermanentWidget(0,@name_login_text,0)
+
+		
 		statusBar().insertPermanentWidget(0,@progress_text,0)
 		statusBar().insertPermanentWidget(1,@progress,0)
 
@@ -190,10 +207,7 @@ class SocialRobot < Qt::MainWindow
 		@loot_action.statusTip = "Посмотреть скачанные файлы"
 		connect(@loot_action, SIGNAL('triggered()'), self, SLOT('show_loot()'))
 
-		@kill_session_action = Qt::Action.new("Очистить сессию", self)
-		@kill_session_action.statusTip = "Очистить сессию"
-		connect(@kill_session_action, SIGNAL('triggered()'), self, SLOT('kill_session()'))
-
+		
 		@open_settings_action = Qt::Action.new("Настройки", self)
 		@open_settings_action.statusTip = "Настройки"
 		connect(@open_settings_action, SIGNAL('triggered()'), self, SLOT('open_settings()'))
@@ -206,13 +220,22 @@ class SocialRobot < Qt::MainWindow
 		@enter_action.statusTip = "Вход в систему"
 		connect(@enter_action, SIGNAL('triggered()'), self, SLOT('enter_system()'))
 
+		@database_peoples = Qt::Action.new("Аккаунты", self)
+		@database_peoples.statusTip = "Редактировать аккаунты"
+		connect(@database_peoples, SIGNAL('triggered()'), self, SLOT('database_peoples()'))
 		
+		@database_proxy = Qt::Action.new("Прокси", self)
+		@database_proxy.statusTip = "Редактировать прокси сервера"
+		connect(@database_proxy, SIGNAL('triggered()'), self, SLOT('database_proxy()'))
 		
 		
 		@exit_action = Qt::Action.new("Выход", self)
 	    @exit_action.shortcut = Qt::KeySequence.new("Ctrl+Q")
 	    @exit_action.statusTip = "Выйти"
 	    connect(@exit_action, SIGNAL('triggered()'), $app, SLOT('closeAllWindows()'))
+		
+		
+		
 		
 		
 		@fileMenu = menuBar().addMenu("Файл")
@@ -223,12 +246,13 @@ class SocialRobot < Qt::MainWindow
 		@fileMenu.addAction(@run_action)
 		@fileMenu.addAction(@stop_action)
 		@fileMenu.addAction(@loot_action)
-		@fileMenu.addAction(@kill_session_action)
 		@fileMenu.addAction(@developer_mode_action)
 		@fileMenu.addAction(@open_settings_action)
+		@fileMenu.addAction(@database_peoples)
+		@fileMenu.addAction(@database_proxy)
 		@fileMenu.addAction(@exit_action)
 		
-		generate_menu(menuBar(),'../prog/Vkontakte')
+		generate_menu(menuBar(),'../prog')
 		generate_menu(menuBar().addMenu("Мои скрипты"),'../../my')
 		
 		
@@ -325,6 +349,20 @@ class SocialRobot < Qt::MainWindow
 
 		#Remember user input
 		@memory_input = {}
+	end
+	
+	def update_name_login_choose()
+		@name_login_choose.clear()
+		$db[:account].each_with_index{|acc,i|@name_login_choose.insertItem(i,acc[:email]);}
+	end
+	
+	def database_peoples
+		AccountTable.new.show
+		update_name_login_choose()
+	end
+	
+	def database_proxy
+		ProxyTable.new.show
 	end
 	
 	#When user clics on link
@@ -527,12 +565,7 @@ class SocialRobot < Qt::MainWindow
 		@code_edit.insertPlainText(data)
 	end
 
-	#On kill session clicked
-	def kill_session
-		@me = nil
-		File.delete(Vkontakte::session_file) if File.exist?(Vkontakte::session_file)
-	end
-
+	
 	
 	#On create script clicked
 	def create_script
@@ -594,6 +627,8 @@ class SocialRobot < Qt::MainWindow
 		@stop_action.setEnabled(!enable)
 		@run_action.setEnabled(enable)
 		@progress.visible = !enable
+		@name_login_choose.visible = enable
+		@name_login_text.visible = enable
 		@progress.setValue(1)
 	end
 	
@@ -636,6 +671,11 @@ class SocialRobot < Qt::MainWindow
 				show_progress do |value,range|
 					robot.total(value,range)
 				end
+				
+				update_session do |login,hash|
+					$db[:account].filter('email = ?', login).update(:hash => hash)
+				end
+				
 				ask_captcha	do |pict|
 					if(Settings["captcha_solver"] == "0")
 						res = ask({"type" => "Image", "Path" => pict} => "string")[0]
@@ -659,9 +699,7 @@ class SocialRobot < Qt::MainWindow
 					end
 					res
 				end
-				ask_login do
-					me
-				end
+				
 				if(Settings["use_anonymizer"] == "true")
 					use_anonymizer
 				else
@@ -669,14 +707,28 @@ class SocialRobot < Qt::MainWindow
 				end
 				
 				
+				
 				if(Settings["use_proxy"] == "true")
 					Vkontakte::use_proxy = true
 					proxy_list = []
-					Settings["proxy_list"].to_s.each_line{|line| l = line.gsub(/\s/,"");proxy_list.push(l.split(":"))}
+					
+					$db[:proxy].each do |p| 
+						login = p[:login]
+						login = nil if(login && login.length == 0)
+						pass = p[:password]
+						pass = nil if(pass && pass.length == 0)
+						proxy_list.push([p[:server],p[:port],login,pass])
+					
+					end
 					Vkontakte::proxy_list = proxy_list
 				else
 					Vkontakte::use_proxy = false
 				end
+				
+				user_list = []
+				$db[:account].each{|acc| user_list.push([acc[:email],acc[:password]])}
+				Vkontakte::user_list = user_list
+				
 				Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
 				Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
 				Vkontakte.like_interval = Settings["like_interval"].to_f
@@ -684,6 +736,10 @@ class SocialRobot < Qt::MainWindow
 				Vkontakte.post_interval = Settings["post_interval"].to_f
 				Vkontakte.invite_interval = Settings["invite_interval"].to_f
 				Vkontakte.transform_captcha = Settings["captcha_solver"] == "0"
+        Vkontakte.user_login_interval = (Settings["login_interval"].nil?)? 4.0:Settings["login_interval"].to_f;
+				ask_login do 
+					me
+				end
 				eval(script)
 				progress "Выполнено"
 				#@progress_text.setStyleSheet("QLabel { color : green; }");
@@ -981,30 +1037,54 @@ class SocialRobot < Qt::MainWindow
 	end
 	
 	
-	#Login user try many variants of login
-	#If credentials fails - exception
-	def login(*params)
-		if(params.length==2)
-			res = User.new.login(params[0],params[1]) 
-			return res if res
-			raise "Не правильный логин/пароль"
+	#Access to User self object
+	def me
+		if @me && @name_login_choose.currentText == @me_login
+			return @me
+		else
+			@me = nil
 		end
-		if(params.length==0)
-			res = User.new.login_from_session
-			return res if res
+		
+		email = @name_login_choose.currentText
+		if(@name_login_choose.currentText && @name_login_choose.currentText.length>0)
+			email.force_encoding("UTF-8")
+			object = $db[:account][:email => email]
+			pass = object[:password]
+			hash = object[:hash]
+			@me = User.login(email,pass,hash)
+			raise "Не правильный логин/пароль" unless @me
+			@me_login = email
+		else
 			res = ask("Логин"=>"string","Пароль"=>"pass")
-			res = User.new.login(res[0],res[1])
-			raise "Не правильный логин/пароль" unless res
-			return res
+			@me = User.login(res[0],res[1])
+			raise "Не правильный логин/пароль" unless @me
+			@me_login = res[0]
+			$db[:account].insert(:email => res[0], :password => res[1])
+			update_name_login_choose()
 		end
+		@me
 	end
 	
 	
-	
-	#Access to User self object
-	def me
-		return @me if @me
-		@me = login
+	def check_users
+		users = []
+		user_logins = []
+		user_list.each do |user|
+			hash = $db[:account][:email => user[0]][:hash]
+			u = User.login(user[0],user[1],hash)
+			if u
+				
+				users.push(u)
+				user_logins.push("#{user[0]}:#{user[1]}")
+				"Зашел #{user[0]}".print
+				
+			else
+				"Не зашел #{user[0]}".print
+			end
+
+		end
+		user_logins.print
+		users
 	end
 
 
@@ -1024,7 +1104,7 @@ class SocialRobot < Qt::MainWindow
 		search_results = agent.submit search_form
 		@anonymizer = "http://" + search_results.uri.host
 		force_location @anonymizer
-  end
+	end
 
 	def sub(original,friend)
 		message_actual = original.dup
@@ -1043,40 +1123,50 @@ class SocialRobot < Qt::MainWindow
 end
 
 
-Thread.new do 
-	need_update = true
-	while need_update do
-		begin
-			Updater.new.update
-			need_update = false
-		rescue
-			need_update = true
-			sleep 360
-		end
-	end
+new_version = nil
+begin
+	new_version = Updater.new.update
+rescue
+		
 end
 
-widget = SocialRobot.new
+unless(new_version)
 
-widget.show
-widget.raise
-
-
-
-
-splash = "../../splash/pid.txt"
-if File.exist?(splash)
 	begin
-		Process.kill "KILL", IO.read(splash).to_i
-	rescue
-	end
-	File.delete(splash)
-end
 	
-$app.exec
+		data = RobotDatabase.new(File.join(File.expand_path("../.."),"data/data.db"))
+		data.update()
+		$db = data.db
+		
+	#rescue
+	
+	
+	end
+
+	widget = SocialRobot.new
+
+	widget.show
+	widget.raise
 
 
 
-
+    splash = "../../splash/pid.txt"
+	if File.exist?(splash)
+		begin
+			Process.kill "KILL", IO.read(splash).to_i
+		rescue
+		end
+		File.delete(splash)
+	end
+	
+	$app.exec
+else
+    Dir.chdir File.join(File.expand_path("../.."),"#{new_version}/gui/")
+	
+	system_command = "\"#{File.join(File.expand_path("../.."),"ruby/bin/rubyw.exe")}\" -r \"#{File.join(File.expand_path("../.."),"#{new_version}/gui/gui.rb")}\""
+	
+	system(system_command)
+	puts "end"
+end
 
 

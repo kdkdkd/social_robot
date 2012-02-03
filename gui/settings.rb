@@ -105,9 +105,8 @@ class SettingsWindow < Qt::Dialog
 		invite_interval_ceckbox = Qt::DoubleSpinBox.new
 		invite_interval_ceckbox.value  = Settings["invite_interval"].to_f
 		layout.addWidget(invite_interval_ceckbox,6,1)
-		
 
-		
+
 
 
 
@@ -118,31 +117,16 @@ class SettingsWindow < Qt::Dialog
 
 		captcha_solver_combo.insertItem(0,"Вручную")
     captcha_solver_combo.insertItem(1,"antigate.com")
-	
-	
-	proxy_use_label = Qt::Label.new
-		proxy_use_label.text = "Использовать прокси?"
-		layout.addWidget(proxy_use_label,8,0)
-		proxy_use_ceckbox = Qt::CheckBox.new
-		proxy_use_ceckbox.checked  = Settings["use_proxy"] == "true"
-		layout.addWidget(proxy_use_ceckbox,8,1)
-	
-	
-	
-	proxy_list_label = Qt::Label.new
-		proxy_list_label.text = "Список прокси серверов"
-		layout.addWidget(proxy_list_label,9,0)
-		proxy_list_ceckbox = Qt::TextEdit.new
-		proxy_list_ceckbox.plainText  = Settings["proxy_list"].to_s
-		layout.addWidget(proxy_list_ceckbox,9,1)
 
 
     window.antigate_key_label = Qt::Label.new
 		window.antigate_key_label.text = "Ключ api. Можно узнать тут:\nhttp://antigate.com/panel.php?action=showkey"
-		layout.addWidget(window.antigate_key_label,10,0)
+		layout.addWidget(window.antigate_key_label,8,0)
 		window.antigate_key_textbox = Qt::LineEdit.new
 		window.antigate_key_textbox.text  = Settings["antigate_key"].to_s
-		layout.addWidget(window.antigate_key_textbox,10,1)
+		layout.addWidget(window.antigate_key_textbox,8,1)
+
+
 
     connect(captcha_solver_combo,SIGNAL('currentIndexChanged ( int )'),window,SLOT('update_captcha_solver ( int )'))
     if(Settings["captcha_solver"]=="1")
@@ -154,9 +138,16 @@ class SettingsWindow < Qt::Dialog
     end
 		layout.addWidget(captcha_solver_combo,7,1)
 
+    login_interval_label = Qt::Label.new
+		login_interval_label.text = "Интервал между входами в систему"
+		layout.addWidget(login_interval_label,9,0)
+		login_interval_ceckbox = Qt::DoubleSpinBox.new
+		login_interval_ceckbox.value  = (Settings["login_interval"].nil?)? 4.0:Settings["invite_interval"].to_f
+		layout.addWidget(login_interval_ceckbox,9,1)
+
 
     exit_button = Qt::PushButton.new("Ок",window)
-		layout.addWidget(exit_button,11,1,Qt::AlignRight)
+		layout.addWidget(exit_button,10,1,Qt::AlignRight)
 		connect(exit_button,SIGNAL('clicked()'),window,SLOT('accept()'))
 
 
@@ -167,18 +158,15 @@ class SettingsWindow < Qt::Dialog
 		window.setLayout(layout)
 		if(window.exec!=0)
 			Settings["use_anonymizer"] = use_anonymizer_ceckbox.checked.to_s
-		Settings["user_fetch_interval"] = user_fetch_interval_ceckbox.value.to_s
-		Settings["photo_mark_interval"] = photo_mark_interval_ceckbox.value.to_s
-		Settings["like_interval"] = like_interval_ceckbox.value.to_s
-		Settings["mail_interval"] = mail_interval_ceckbox.value.to_s
-		Settings["post_interval"] = post_interval_ceckbox.value.to_s
-		Settings["invite_interval"] = invite_interval_ceckbox.value.to_s
-		Settings["captcha_solver"] = captcha_solver_combo.currentIndex.to_s
-		Settings["use_proxy"] = proxy_use_ceckbox.checked.to_s
-		Settings["proxy_list"] = proxy_list_ceckbox.plainText.to_s
-      
-	  
-	  if(captcha_solver_combo.currentIndex == 0)
+      Settings["user_fetch_interval"] = user_fetch_interval_ceckbox.value.to_s
+      Settings["photo_mark_interval"] = photo_mark_interval_ceckbox.value.to_s
+      Settings["like_interval"] = like_interval_ceckbox.value.to_s
+      Settings["mail_interval"] = mail_interval_ceckbox.value.to_s
+      Settings["post_interval"] = post_interval_ceckbox.value.to_s
+      Settings["invite_interval"] = invite_interval_ceckbox.value.to_s
+      Settings["login_interval"] = login_interval_ceckbox.value.to_s
+      Settings["captcha_solver"] = captcha_solver_combo.currentIndex.to_s
+      if(captcha_solver_combo.currentIndex == 0)
          Settings["antigate_key"] = nil
       else
          Settings["antigate_key"] = window.antigate_key_textbox.text.to_s

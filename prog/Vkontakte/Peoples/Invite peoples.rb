@@ -1,2 +1,2 @@
 #Найти и пригласить друзей
-ask_peoples.invite_durov
+ask_peoples.invite(ask_string("Сообщение для приглашения"))
