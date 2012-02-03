@@ -216,7 +216,8 @@ module Vkontakte
 		elsif !self_connect.nil?
 			connect = self_connect
 		else
-			connect = ask_login
+			ask_res = ask_login
+      connect = ask_res.connect if ask_res
 		end
 		connect
 	end
@@ -1298,7 +1299,7 @@ module Vkontakte
 
 		def User.force_all(query = '', hash_qparams = {}, connector=nil)
 
-			res = User.all_offset(query,0,hash_qparams,connector)
+			res = User.all_offset(query,0,hash_qparams,connector,true)
 			sleep 1
 			from =  hash_qparams["От"] || 12
 			to =  hash_qparams["До"] || 80
@@ -1333,7 +1334,7 @@ module Vkontakte
 
 				index = offset
 				while true do
-					res = User.all_offset(query,index,hash_qparams,connector)
+					res = User.all_offset(query,index,hash_qparams,connector,false)
 					sleep 0.3
 					progress "Searching users #{query} offset #{index}..."
 					json_has_more = res[1]
@@ -1361,9 +1362,9 @@ module Vkontakte
 		end
 		
 		
-		def User.all_offset(query = '', offset = 0, hash_qparams = {}, connector=nil)
+		def User.all_offset(query = '', offset = 0, hash_qparams = {}, connector=nil, force_all = false)
 			connect = forсe_login(connector)
-			return [] unless connect.login
+			return [[],false,0,nil] unless connect.login
 			
 			qhash = {'al' => '1', 'c[q]' => query, 'c[section]' => 'people', 'offset' => offset.to_s}
 			country_name = hash_qparams["Страна"]
@@ -1410,10 +1411,11 @@ module Vkontakte
 					if (json_length_string.length != 0)
 						json_length = json_length_string.to_i
 						json_valid = true
-					end
+          end
+
 				end
 				res_array = []
-				if(offset>0 || json_valid)
+				if(offset>0 || json_valid || !force_all)
 					html_text = res.split("<!>").find{|x| x.index '<div'}
 					return [[],false,0,nil] unless html_text
 					html = Nokogiri::HTML(html_text)
