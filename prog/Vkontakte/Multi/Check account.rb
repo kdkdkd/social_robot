@@ -34,6 +34,9 @@ user_logins.print
 if(additional_info)
 	"".print
 	"Логин:Пароль:Друзей:Голосов".print
-	user_info.sort{|x,y|y.split(":")[2].to_i <=> x.split(":")[2].to_i}.print
+	user_info.sort do |x,y| 
+		res_sort = y.split(":")[0].index("@").to_i <=> x.split(":")[0].index("@").to_i
+		res_sort = y.split(":")[2].to_i <=> x.split(":")[2].to_i if(res_sort = 0)
+ 	end.print
 end
 		

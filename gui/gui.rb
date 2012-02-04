@@ -730,8 +730,9 @@ class SocialRobot < Qt::MainWindow
 				
 				user_list = []
 				$db[:account].each{|acc| user_list.push([acc[:email],acc[:password]])}
-				Vkontakte::user_list = user_list
-				
+				user_list.uniq!{|a|a[0]}
+        Vkontakte::user_list = user_list
+
 				Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
 				Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
 				Vkontakte.like_interval = Settings["like_interval"].to_f

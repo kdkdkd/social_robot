@@ -8,9 +8,13 @@
 		
 		edit = Qt::TextEdit.new
 		proxy = $db[:proxy]
-		
-		proxy.each{|p| add_string = "#{p[:server]}:#{p[:port]}"; add_string+=":#{p[:login]}:#{p[:password]}" if((p[:password] && p[:password].length>0) || (p[:login] && p[:login].length>0));  edit.plainText += "#{add_string}\n"}
-		
+		all = ""
+		proxy.each do |p|
+      add_string = "#{p[:server]}:#{p[:port]}"
+      add_string+=":#{p[:login]}:#{p[:password]}" if((p[:password] && p[:password].length>0) || (p[:login] && p[:login].length>0))
+      all += "#{add_string}\n"
+    end
+		edit.plainText = all
 		
 		
 		ok = Qt::PushButton.new
