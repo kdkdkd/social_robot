@@ -143,6 +143,8 @@ module Vkontakte
   def user_login_interval=(value)
       @@user_login_interval=value
   end
+  
+	@@last_user_login = nil
 
 	@@transform_captcha = false
 	def transform_captcha=(value)
@@ -459,72 +461,14 @@ module Vkontakte
 		end
 		
 		
-		#login with given login and password
-		def login
-			return true if @cookie_login
-
-      if(@last_user_fetch_date)
-				diff = Time.new - @last_user_fetch_date
-				sleep(@@user_fetch_interval - diff) if(diff<@@user_fetch_interval)
-			end
-
-      progress "Logging in..."
-
-			#check captcha
-			login_hash = {'op'=>'a_login_attempt','login' => @login}
-			captcha_sid = nil
-			captcha_key = nil
-			while true
-				login_hash["captcha_sid"] = captcha_sid if captcha_sid
-				login_hash["captcha_key"] = captcha_key if captcha_key
-				a_login_attempt = @agent.post(addr('/login.php'),login_hash)
-				login_attempt_captcha = a_login_attempt.body.scan(/\"captcha\_sid\"\:\"([^\"]+)\"/)[0]
-				if(login_attempt_captcha)
-					captcha_sid = login_attempt_captcha[0]
-					captcha_key = ask_captcha_internal(captcha_sid)
-				else
-					break
-				end
-			end
-			
-				progress "Logging in..."
-				@agent.get(addr("/")) do |login_page|
-				login_result = login_page.form_with(:name => 'login') do |login|
-					login.pass = @password
-					login.email = @login
-				end.submit
-
-        @cookie_login = @agent.cookies.dup
-        was_remixsid = nil
-				@agent.cookies.each do |cookie|
-					was_remixsid = cookie if cookie.name == "remixsid"
-				end
-
-				if was_remixsid
-					id = check_login
-					if(id)
-						update_session(@login,@cookie_login.value)
-						progress "Done login"
-						@uid = id
-						return id
-					else
-						#need phone prove
-						progress "Failed"
-						return false
-					end
-				else
-					progress "Failed"
-					return false
-				end
-			end
-    end
+	
 
     def login
       return true if @cookie_login
 			progress "Logging in..."
 
-      if(@last_user_login_date)
-				diff = Time.new - @last_user_fetch_date
+      if(@@last_user_login )
+				diff = Time.new - @@last_user_login 
 				sleep(@@user_login_interval - diff) if(diff<@@user_login_interval)
 			end
 
@@ -558,7 +502,7 @@ module Vkontakte
       "to"=>"","vk"=>"1","al_test"=>"3","from_host"=>"vk.com","from_protocol"=>"http","ip_h"=>ip_h,
       "email"=> @login,"pass"=> @@utf_converter.encode(@password),"expire"=>""
       })
-        @last_user_login_date = Time.new
+        @@last_user_login  = Time.new
 
         @agent.cookies.each do |cookie|
 					@cookie_login = cookie if cookie.name == "remixsid"

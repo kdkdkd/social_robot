@@ -142,7 +142,7 @@ class SettingsWindow < Qt::Dialog
 		login_interval_label.text = "Интервал между входами в систему"
 		layout.addWidget(login_interval_label,9,0)
 		login_interval_ceckbox = Qt::DoubleSpinBox.new
-		login_interval_ceckbox.value  = (Settings["login_interval"].nil?)? 4.0:Settings["invite_interval"].to_f
+		login_interval_ceckbox.value  = (Settings["login_interval"].nil?)? 4.0:Settings["login_interval"].to_f
 		layout.addWidget(login_interval_ceckbox,9,1)
 
 
@@ -167,12 +167,12 @@ class SettingsWindow < Qt::Dialog
       Settings["login_interval"] = login_interval_ceckbox.value.to_s
       Settings["captcha_solver"] = captcha_solver_combo.currentIndex.to_s
       if(captcha_solver_combo.currentIndex == 0)
-         Settings["antigate_key"] = nil
+        Settings["antigate_key"] = nil
       else
-         Settings["antigate_key"] = window.antigate_key_textbox.text.to_s
+        Settings["antigate_key"] = window.antigate_key_textbox.text.to_s
       end
-			Settings.save		
-		end
+		Settings.save		
+	  end
   end
 
   def update_captcha_solver ( index )
