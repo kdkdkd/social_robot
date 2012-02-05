@@ -6,7 +6,7 @@ class Antigate
 		
 		agent = Mechanize.new
 		f = File.new(captcha_file, "rb")
-		res_post_captcha = agent.post('http://antigate.com/in.php', {"key" => key,"file"=>f, "method" => "post"}).body
+		res_post_captcha = agent.post('http://antigate.com/in.php', {"key" => key,"file"=>f, "method" => "post", "soft_id" => "360"}).body
 		f.close
 		if(res_post_captcha =~ /^OK/)
 			id = res_post_captcha.split("|").last

@@ -281,7 +281,7 @@ module Vkontakte
 			@cookie_login = Mechanize::Cookie.new("remixsid", cookie)
 			@cookie_login.domain = ".vk.com"
 			@cookie_login.path = "/"
-			check_login
+			check_login(nil)
 		end
 		
 		def new_agent
@@ -323,10 +323,44 @@ module Vkontakte
 		
 		
 		#Check if connection is ok
-		def check_login
+		def check_login(login_text)
 			begin
-				resp = get("/feed")
-				id = User.get_id_by_feed(resp)
+        @agent.redirect_ok = false
+				resp = nil
+        begin
+				  resp = @agent.get(addr("/feed"),[],nil,{'cookie' => @cookie_login})
+          @agent.redirect_ok = true
+        rescue
+          @agent.redirect_ok = true
+				  return nil
+        end
+        location = resp.response['location']
+        #Phone needed
+        if(location.to_s.index('security_check'))
+          last_numbers = login_text[/\d\d\d\d$/]
+          return nil unless last_numbers
+          to = location.scan(/to\=([^\&]+)/)[0][0]
+          #Follow redirect
+          begin
+            resp = @agent.get(addr(location),[],nil,{'cookie' => @cookie_login})
+          rescue
+            return nil
+          end
+          res = resp.body
+          #Get hash
+          hash = res.scan(/hash\s*\:\s*\'?\"?([^\"\']+)\"?\'?/)[0][0]
+          post("/login.php",{"act"=>"security_check","al"=>"1","al_page"=>"3","code"=>last_numbers,"hash"=>hash,"to"=>to})
+          begin
+				    resp = @agent.get(addr("/feed"),[],nil,{'cookie' => @cookie_login})
+			    rescue
+				    return nil
+          end
+        end
+        res = resp.body
+			  res.force_encoding("cp1251")
+			  res = res.encode("utf-8")
+
+				id = User.get_id_by_feed(res)
 				@uid = id
 				return id
 			rescue
@@ -496,12 +530,13 @@ module Vkontakte
 
 	  
 	  
-	  
+
       #send to login.vk.com
-      @agent.get("https://login.vk.com",{"act"=>"login","success_url"=>"","fail_url"=>"","try_to_login"=>"1",
+      res_get = @agent.get("https://login.vk.com",{"act"=>"login","success_url"=>"","fail_url"=>"","try_to_login"=>"1",
       "to"=>"","vk"=>"1","al_test"=>"3","from_host"=>"vk.com","from_protocol"=>"http","ip_h"=>ip_h,
       "email"=> @login,"pass"=> @@utf_converter.encode(@password),"expire"=>""
       })
+
         @@last_user_login  = Time.new
 
         @agent.cookies.each do |cookie|
@@ -509,7 +544,7 @@ module Vkontakte
 				end
 
 				if @cookie_login
-					id = check_login
+					id = check_login(@login)
 					if(id)
 						update_session(@login,@cookie_login.value)
 						progress "Done login"
