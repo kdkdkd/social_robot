@@ -349,6 +349,8 @@ class SocialRobot < Qt::MainWindow
 		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Или нажмите на кнопку <img src=\"images/vkontakte.png\"/> Это покажет Вас и Ваших друзей и абсолютно безобидно.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a>")
 		
 		update_developer_mode()
+		
+		@threads = []
 
 		#Remember user input
 		@memory_input = {}
@@ -463,9 +465,12 @@ class SocialRobot < Qt::MainWindow
         @changed = false
 		if Settings["developer_mode"] == "false"
 			@thread.kill if @thread
+			@threads.each{|t| t.kill}
+			@threads = []
 			while @thread && @thread.alive? do
 				sleep 0.1
 			end
+			
 			run_gui(true)
 			run_script
 		end
@@ -614,6 +619,8 @@ class SocialRobot < Qt::MainWindow
 	#On stop script clicked
 	def stop_script
 		@thread.kill if @thread
+		@threads.each{|t| t.kill}
+		@threads = []
 		run_gui(true)
 		@progress_text.text = "Остановлено"
 		@progress_text.setStyleSheet("QLabel { color : red; }");
@@ -1075,7 +1082,7 @@ class SocialRobot < Qt::MainWindow
 		user_logins = []
 		user_list.each do |user|
 			hash = $db[:account][:email => user[0]][:hash]
-			u = User.login(user[0],user[1],hash)
+			u = safe{User.login(user[0],user[1],hash)}
 			if u
 				
 				users.push(u)
@@ -1124,6 +1131,14 @@ class SocialRobot < Qt::MainWindow
 		"$Имя - имя пользователя\n$ИмяФамилия - Имя и фамилия пользователя\n{привет|здорово|хай} - теги"
 	end
 	
+	
+	def add_thread(thread)
+		@threads<<thread
+	end
+	
+	def join_threads
+		@threads.each{|t|t.join}
+	end
 end
 
 
