@@ -904,7 +904,7 @@ module Vkontakte
 		end
 		
 		def User.get_id_by_feed(resp)
-			resp.scan(/id\:\s*([^\,]*)\,/)[0][0]
+			resp.scan(/\"?\'?id\"?\'?\s*\:\s*\"?\'?([^\,\'\"]+)/)[0][0]
 		end
 		
 		
