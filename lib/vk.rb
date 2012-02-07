@@ -447,13 +447,17 @@ module Vkontakte
 		end
 
 		#Fetch group page
-		def get_group(id)
+		def get_group(id,type)
 			if(@last_user_fetch_date)
 				diff = Time.new - @last_user_fetch_date
 				sleep(@@user_fetch_interval - diff) if(diff<@@user_fetch_interval)
 			end
 			if id =~ /^\d+$/
-				href = "/club#{id}"
+        if(type == "group")
+				  href = "/club#{id}"
+        else
+          href = "/public#{id}"
+        end
 			else
 				href = "/#{id}"
 			end
@@ -727,12 +731,27 @@ module Vkontakte
 		attr_accessor :connect
 		
 		include Vkontakte::PostMaker
-		
+
+    def initialize()
+      @open = "unknown"
+      @type = "unknown"
+    end
+
+    #Public is "public". "group" means group or event
+    def type
+			return @type if @type != "unknown"
+			info
+			@type
+    end
+
+    def type=(value)
+      @type = value
+    end
+
 		def set(id,name=nil,connect=nil)
 			@id = id.to_s
 			@name = name
-			@open = "unknown"
-			@connect = (connect)?connect:Vkontakte::last_connect
+			@connect = (connect)? connect:Vkontakte::last_connect
 			self
 		end
 
@@ -749,8 +768,12 @@ module Vkontakte
 			"-#{id}"
 		end
 
-		def Group.get_id_by_group_page(resp)
-			resp.scan(/\"group_id\"\:\"?([\d]*)?/)[0][0]
+		def Group.get_id_by_group_page(resp,type)
+      if(type == "group")
+			  resp.scan(/\"group_id\"\:\"?([\d]*)?/)[0][0]
+      else
+        resp.scan(/\"public_id\"\:\"?([\d]*)?/)[0][0]
+      end
 		end
 
 		def name
@@ -789,53 +812,74 @@ module Vkontakte
 			connect = forсe_login(connector,@connect)
 			progress "Fetching group info(#{@id})..."
 
-			resp = connect.get_group(@id)
+			resp = connect.get_group(@id,@type)
+      @open = resp.index("Закрытая группа").nil?
+      @type = (resp.index("group_id"))?"group":"public"
 			begin
-				@id = Group.get_id_by_group_page(resp)
+				@id = Group.get_id_by_group_page(resp, @type)
 				@name = Nokogiri::HTML(resp).xpath("//title").text unless @name
 			rescue
 				@id = nil
 				return
 			end
-			@open = resp.index("Открытая группа")
+
+
 			@post_hash = User.get_post_hash(resp)
 			begin
-				@group_hash = resp.scan(Regexp.new("#{@id}\,\s*\'([^\']*)\'"))[0][0]
+
+
+        if(type == "group")
+          @group_hash = resp.scan(Regexp.new("#{@id}\,\s*\'([^\']*)\'"))[0][0]
+        else
+          @group_hash = resp.scan(/\"?\'?enterHash\"?\'?\s*\:\s*\"?\'?([^\'\"]+)\"?\'?/)[0][0]
+        end
 			rescue
 				@group_hash = nil
 			end
 		end
 
-		def Group.id(id_set)
-			Group.new.set(id_set,nil,forсe_login(nil))
-		end
-		
 		def group_hash
 			return @group_hash if @group_hash
 			info
 			@group_hash
-		end
+    end
+
+    def Group.id(some_id,connector=nil)
+
+      res = Group.parse("/public" + some_id.to_s,connector)
+      res.info
+      unless res.id
+        res = Group.parse("/club" + some_id.to_s,connector)
+        res.info
+      end
+      res
+    end
 		
 		def Group.parse(href,connector=nil)
 			connect = forсe_login(connector)
+      res = nil
 			if(href.index("/club"))
-				Group.new.set(href.split("/club").last,nil,connect)
+				res = Group.new.set(href.split("/club").last,nil,connect)
+        res.type = "group"
 			elsif (href.index("/event"))
-				Group.new.set(href.split("/event").last,nil,connect)
+				res = Group.new.set(href.split("/event").last,nil,connect)
+        res.type = "group"
+      elsif (href.index("/public"))
+				res = Group.new.set(href.split("/public").last,nil,connect)
+        res.type = "public"
 			elsif
 				id = href.split("/").last
 				res = Group.new.set(id,nil,connect)
 				res.info
-				return nil if id.nil?
-				return res
-			end
+        return nil if id.nil?
+      end
+			return res
 		end
 
 		def users
-			res = []
-			progress :search_users,self
-			res = User.force_all('', {"Группа"=>id})
-			res
+		  progress :search_users,self
+			User.force_all('', {"Группа"=>id})
+
 		end
 
 		def open
@@ -849,7 +893,11 @@ module Vkontakte
 			@connect = forсe_login(connector,@connect)
 			return unless group_hash
 			progress "Entering group #{id} ..."
-			connect.post('/al_groups.php',{"act" => "enter", "al" => "1", "gid" => id , "hash" => group_hash})
+			if(type=="group")
+        connect.post('/al_groups.php',{"act" => "enter", "al" => "1", "gid" => id , "hash" => group_hash})
+      else
+        connect.post('/al_public.php',{"act" => "a_enter", "al" => "1", "pid" => id , "hash" => group_hash})
+      end
 			@connect = old_connect
 			progress :group_entered,self
 		end
@@ -859,8 +907,12 @@ module Vkontakte
 			@connect = forсe_login(connector,@connect)
 			return unless group_hash
 			progress "Leaving group (#{id})..."
-			сonnect.post('/al_groups.php',{"act" => "enter", "context" => "_decline" ,"al" => "1", "gid" => id , "hash" => group_hash})
-			connect.post('/al_groups.php',{"act" => "leave", "al" => "1", "gid" => id , "hash" => group_hash})
+      if(type=="group")
+			  @connect.post('/al_groups.php',{"act" => "enter", "context" => "_decline" ,"al" => "1", "gid" => id , "hash" => group_hash})
+			  @connect.post('/al_groups.php',{"act" => "leave", "al" => "1", "gid" => id , "hash" => group_hash})
+      else
+        @connect.post('/al_public.php',{"act" => "a_leave", "al" => "1", "pid" => id , "hash" => group_hash})
+      end
 			@connect = old_connect
 			progress :group_leaved,self
 		end
@@ -1039,7 +1091,6 @@ module Vkontakte
 
 		def friends
 			return false unless @connect.login
-			
 			if(@me)
 				progress "List of my friends..."	
 				friends_json = JSON.parse(@connect.post('/al_friends.php', {"act" => "pv_friends","al" => "1"}).gsub(/^.*\<\!json\>/,''))

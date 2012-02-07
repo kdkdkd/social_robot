@@ -1081,6 +1081,7 @@ class SocialRobot < Qt::MainWindow
 		users = []
 		user_logins = []
 		user_list.each do |user|
+      next if user.nil?
 			hash = $db[:account][:email => user[0]][:hash]
 			u = safe{User.login(user[0],user[1],hash)}
 			if u

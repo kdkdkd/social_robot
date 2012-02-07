@@ -31,7 +31,9 @@ else
     photo = nil
 end
 
-
+mutex = Mutex.new
+total_index = 0
+current_index = 0
 
 check_users.each do |user|
 
@@ -42,6 +44,9 @@ check_users.each do |user|
 
 		friends = [] unless friends
 
+		mutex.synchronize{
+			total_index += friends.length
+		}
 		#Для каждого друга
 		friends.each_with_index do |friend,index|
    
@@ -52,8 +57,10 @@ check_users.each do |user|
 			#Шлем сообщение другу
    			safe{friend.mail(message_actual,photo,video,music,title_actual)}
 
+			mutex.synchronize{current_index+=1}
+
    			#Обновляем прогресс бар
-   			total(index,friends.length)
+   			total(current_index,total_index)
 		end
 
 	end)
