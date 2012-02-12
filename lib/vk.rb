@@ -30,19 +30,19 @@ module Vkontakte
 				hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id_to_post, "type" => "all" }
 				attach_number = 1
 				if(attach_photo)
-					hash["attach#{attach_number}"] = "#{attach_photo.album.user.id}_#{attach_photo.id}"
+					hash["attach#{attach_number}"] = attach_photo
 					hash["attach#{attach_number}_type"] = "photo"
 					attach_number += 1
 				end
 				
 				if(attach_video)
-					hash["attach#{attach_number}"] = "#{attach_video.user.id}_#{attach_video.id}"
+					hash["attach#{attach_number}"] = attach_video
 					hash["attach#{attach_number}_type"] = "video"
 					attach_number += 1
 				end
 				
 				if(attach_music)
-					hash["attach#{attach_number}"] = "#{attach_music.owner.id}_#{attach_music.id}"
+					hash["attach#{attach_number}"] = attach_music
 					hash["attach#{attach_number}_type"] = "audio"
 				end
 				
@@ -317,9 +317,13 @@ module Vkontakte
 				end
 			end
 			
-			@login = login
+			@email = login
 			@password = password
-		end
+    end
+
+    def email
+      @email
+    end
 		
 		
 		#Check if connection is ok
@@ -511,7 +515,7 @@ module Vkontakte
 			end
 
       #check captcha
-			login_hash = {'op'=>'a_login_attempt','login' => @login}
+			login_hash = {'op'=>'a_login_attempt','login' => @email}
 			captcha_sid = nil
 			captcha_key = nil
 			while true
@@ -538,7 +542,7 @@ module Vkontakte
       #send to login.vk.com
       res_get = @agent.get("https://login.vk.com",{"act"=>"login","success_url"=>"","fail_url"=>"","try_to_login"=>"1",
       "to"=>"","vk"=>"1","al_test"=>"3","from_host"=>"vk.com","from_protocol"=>"http","ip_h"=>ip_h,
-      "email"=> @login,"pass"=> @@utf_converter.encode(@password),"expire"=>""
+      "email"=> @email,"pass"=> @@utf_converter.encode(@password),"expire"=>""
       })
 
         @@last_user_login  = Time.new
@@ -548,9 +552,9 @@ module Vkontakte
 				end
 
 				if @cookie_login
-					id = check_login(@login)
+					id = check_login(@email)
 					if(id)
-						update_session(@login,@cookie_login.value)
+						update_session(@email,@cookie_login.value)
 						progress "Done login"
 						@uid = id
 
@@ -724,6 +728,9 @@ module Vkontakte
 			progress :music_removed,@name
 		end
 
+    def attach_code
+      "#{owner.id}_#{id}"
+    end
 
 	end
 	
@@ -1043,7 +1050,11 @@ module Vkontakte
 		
 		def User.login(login,pass,hash = nil)
 			User.new.login(login,pass,hash)
-		end
+    end
+
+    def email
+      @connect.email
+    end
 		
 		#login with current login and password
 		def login(login,pass,hash = nil)
@@ -1178,13 +1189,12 @@ module Vkontakte
 					array.push(Album.new.set(self,new_album_id,new_album_name,album_delete_hash,connect))
 					array
 				end
-				break if current_res.length == 0
+				break if current_res.length + add_to_length == 0
 				total_res += current_res
 				offset+=current_res.length
         offset += add_to_length
 			end
 			total_res
-		end
 		end
 
 		
@@ -1208,17 +1218,17 @@ module Vkontakte
 				hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
 				was_attach = false
 				if(attach_photo)
-					hash["media"] = "photo:#{attach_photo.album.user.id}_#{attach_photo.id}"
+					hash["media"] = "photo:#{attach_photo}"
 					was_attach = true
 				end
 				if(attach_video)
 					hash["media"] += "," if was_attach
-					hash["media"] += "video:#{attach_video.user.id}_#{attach_video.id}"
+					hash["media"] += "video:#{attach_video}"
 					was_attach = true
 				end
 				if(attach_music)
 					hash["media"] += "," if was_attach
-					hash["media"] += "audio:#{attach_music.owner.id}_#{attach_music.id}"
+					hash["media"] += "audio:#{attach_music}"
 					was_attach = true
 				end
 				unless(captcha_key.nil?)
@@ -1661,12 +1671,17 @@ module Vkontakte
 				safe{
 					progress "Uploading #{filename} ..."  
 					#Asking for upload parameters and server
-					post = connect.post('/al_photos.php',{"__query" => "album#{user.id}_#{id}", "al" => "-1", "al_id" => user.id})
-					hash = post.scan(/hash[^\da-z]+([\da-z]+)/)[0][0]
-					rhash = post.scan(/rhash[^\da-z]+([\da-z]+)/)[0][0]
-					addr = post.scan(/flashLiteUrl\s*\=\s*([^\;]+)/)[0][0].gsub("\"",'').gsub("'",'').gsub("\\",'')
-					
-					params = {"oid" => user.id, "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "rhash" => rhash, "act" => "do_add", "ajx" => "1"}
+					#post = connect.post('/al_photos.php',{"__query" => "album#{user.id}_#{id}", "al" => "-1", "al_id" => user.id})
+					#hash = post.scan(/hash[^\da-z]+([\da-z]+)/)[0][0]
+					#rhash = post.scan(/rhash[^\da-z]+([\da-z]+)/)[0][0]
+					#addr = post.scan(/flashLiteUrl\s*\=\s*([^\;]+)/)[0][0].gsub("\"",'').gsub("'",'').gsub("\\",'')
+
+          get = connect.get("/album#{user.id}_#{id}?act=add")
+          addr = get.scan(/\'?\"?url\"?\'?\s*\:\s*\'?\"?([^\'\"\,]+)/)[0][0]
+          fields = JSON.parse(get.scan(/\'?\"?fields\'?\"?\s*\:\s*(\{[^\}]+\})/)[0][0])
+
+
+					params = {"oid" => user.id, "aid" => id, "gid" => "0", "mid" => user.id, "hash" => fields["hash"], "rhash" => fields["rhash"], "act" => "do_add", "ajx" => "1"}
 					res = nil
 					safe_file_name(filename) do |file_safe|
 						f = File.new(file_safe, "rb")
@@ -1686,7 +1701,7 @@ module Vkontakte
 					params = {"photos" => photos,"server" => server,"from" => "html5","context" => "1", "al" => "1", "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "act" => "done_add"}
 					res = connect.post('/al_photos.php',params)
 					hash = res.scan(/deletePhoto[^\,]+\,\s*([^\)]+)/)[0][0].gsub("\"",'').gsub("'",'')
-					res_internal = Image.new.set(self,res.split("<!>").last.split("_").last,res.scan(/x_src\:\s*([^\,]+)/)[0][0].gsub("\"","").gsub("'",""),hash,true,connect)
+					res_internal = Image.new.set(self,res.split("<!>").last.split("_").last,res.scan(/src\=\s*\"([^\"]+)\"/)[0][0].gsub("\"","").gsub("'",""),hash,true,connect)
 					if many
 						res_total.push(res_internal)
 					else
@@ -1753,7 +1768,11 @@ module Vkontakte
 			@open = open
 			@hash_vk = hash_vk
 			self
-		end
+    end
+
+    def attach_code
+      "#{album.user.id}_#{id}"
+    end
 		
 		
 		def Image.parse(href)
@@ -1947,7 +1966,7 @@ module Vkontakte
 
 	class Video
 		attr_accessor :id, :user
-		def Video.parse(href)
+		def Video.parse(code)
 			id_complex = href.scan(/video\d+\_\d+/)[0]
 			id_complex = id_complex.gsub("video","")
 			id_complex_split = id_complex.split("_")
@@ -1956,6 +1975,49 @@ module Vkontakte
 			res_video.user = User.id(id_complex_split[0])
 			res_video
 			
+    end
+    def attach_code
+      "#{user.id}_#{id}"
+    end
+		
+		def Video.upload_youtube(code,title,connector = nil)
+			connect = forсe_login(connector)
+			upload_box = connect.post("/al_video.php", {"act" => "upload_box", "al" => "1", "oid" => connect.uid})
+			hash_scan = upload_box.scan(/\'?\"?act\'?\"?\s*\:\s*\'?\"?save_external\'?\"?\s*\,\s*hash\s*\:\s*\'?\"?([^\"\']+)\"?\'?/)[0]
+			html = Nokogiri::HTML(upload_box.split("<!>").find{|x| x.index("<div")})
+      hash_prepare = html.xpath("//form[@target = 'video_share_frame']/input[@name = 'hash']")[0]["value"]
+      rhash_prepare = html.xpath("//form[@target = 'video_share_frame']/input[@name = 'rhash']")[0]["value"]
+      action = html.xpath("//form[@target = 'video_share_frame']/@action").text
+
+      prepare_res = connect.post(action,{"url" => "http://www.youtube.com/watch?v=#{code}","act" => "parse_share", "from_host" => "vk.com", "mid" => connect.uid, "hash" => hash_prepare, "rhash" => rhash_prepare} )
+      extra = prepare_res.scan(/extra\s*:\s*([^\,]+)/)[0][0]
+      extra_data = prepare_res.scan(/extraData\s*:\s*\'([^\']+)/)[0][0]
+      images = prepare_res.scan(/images\s*:\s*\[\'([^\']+)/)[0][0]
+
+      return unless hash_scan
+			hash = hash_scan[0]
+			
+			
+			res = connect.post("/al_video.php", {"act"  => "save_external", "al"  => "1" , "description" => "",
+			"domain" => "www.youtube.com", "hash" => hash,
+			'extra' => extra,
+      'extra_data' => extra_data,
+			"image_url" => "http://img.youtube.com/vi/#{code}/maxresdefault.jpg",
+			"oid" => connect.uid,
+			"privacy_video" => "0",
+			"privacy_videocomm" => "0",
+      "image_url" => images,
+			"share_title" => title,
+			"title" => title,
+			"to_video" => "1",
+			"url" => "http://www.youtube.com/watch?v=#{code}"})
+      json = JSON.parse(res.split("<!>").find{|x| x.index("<!json>")}.gsub("<!json>",""))
+
+      res_video = Video.new
+			res_video.id = json["video_id"]
+			res_video.user = User.id(connect.uid)
+			res_video
+		
 		end
 		
 	end

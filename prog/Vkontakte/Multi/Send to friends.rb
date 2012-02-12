@@ -1,34 +1,38 @@
 
 #Спросить, какое сообщение отправлять
-result_ask = ask("Тема" => "string" , "Сообщение.\n\n#{aviable_text_features}" => "text","Адрес видео\nvk.com/video9490653_160343384" => "string", "Название музыки в вашем списке(можно пустое)" => "string","Адрес фотографии\n например vk.com/photo9490653_247429819\nможно пустое" => "string")
+result_ask = ask("Тема" => "string" , "Сообщение.\n\n#{aviable_text_features}" => "text","Адрес видео\nvk.com/video9490653_160343384" => "string","ИЛИ код видео на youtube\n например если видео http://www.youtube.com/watch?v=6xDAxQ9GpXM , то код - 6xDAxQ9GpXM" => "string", "Название музыки в вашем списке(можно пустое)" => "string","Адрес фотографии\n например vk.com/photo9490653_247429819\nможно пустое" => "string","ИЛИ укажите место на вашем ПК" => "file")
 title = result_ask[0]
 message = result_ask[1]
 
 
 #Найти  видео
 video =  result_ask[2]
+video_you =  result_ask[3]
 if(video.length>0)
-   video = Video.parse(video)
+   video = Video.parse(video).attach_code
+elsif(video_you.length>0)
+   video = Video.upload_youtube(video_you,"").attach_code
 else
    video = nil
 end
 
 
 #Найти музыку
-music =  result_ask[3]
+music =  result_ask[4]
 if(music.length>0)
-   music = me.music.one(music)
+   music = me.music.one(music).attach_code
 else
    music = nil
 end
 
 
 #Найти фото
-photo =  result_ask[4]
+photo =  result_ask[5]
+photo_local =  result_ask[6]
 if(photo.length>0)
-    photo = Image.parse(photo)
-else
-    photo = nil
+    photo = Image.parse(photo).attach_code
+elsif(photo_local.length>0)
+    photo = Album.create("Новый","альбом").upload(photo_local,"").attach_code
 end
 
 mutex = Mutex.new
