@@ -1167,24 +1167,24 @@ module Vkontakte
 				else
 					xml = Nokogiri::HTML(@connect.post("/albums#{id}",hash_params).split("<!>").find{|x| x.index "<div"})
 				end
-				
-				current_res = xml.xpath("//div[@class='name']/a").inject([]) do |array,a| 
+				add_to_length = 0
+
+				current_res = xml.xpath("//div[@class='cont']/a").inject([]) do |array,a|
 					album_delete_hash = nil
 					
-					a.xpath("../..//a").each do |a_delete| 
-						a_delete_onclick = a_delete["onclick"]
-						if(a_delete_onclick && a_delete_onclick.index("photos.deleteAlbum"))
-							album_delete_hash = a_delete_onclick.scan(/\'([^\']+)\'/)[1][0]
-						end
-					end
-					array.push(Album.new.set(self,a["href"].scan(/_(\d+)/)[0][0],a.text,album_delete_hash,connect))
+          new_album_id = a["href"].scan(/_(\d+)/)[0][0]
+          add_to_length -= 1 if (new_album_id == "0" || new_album_id == "00")
+          new_album_name = a.xpath(".//div[@class='ge_photos_album fl_l']").text
+					array.push(Album.new.set(self,new_album_id,new_album_name,album_delete_hash,connect))
 					array
 				end
 				break if current_res.length == 0
 				total_res += current_res
 				offset+=current_res.length
+        offset += add_to_length
 			end
 			total_res
+		end
 		end
 
 		
