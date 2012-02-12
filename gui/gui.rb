@@ -487,7 +487,7 @@ class SocialRobot < Qt::MainWindow
 	end
 
 	def notify
-		open(File.expand_path("./sounds/notification.mp3"))
+		#open(File.expand_path("./sounds/notification.mp3"))
 	end
 
 	#Log with red color
