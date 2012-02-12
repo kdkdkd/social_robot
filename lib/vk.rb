@@ -1989,7 +1989,7 @@ module Vkontakte
       rhash_prepare = html.xpath("//form[@target = 'video_share_frame']/input[@name = 'rhash']")[0]["value"]
       action = html.xpath("//form[@target = 'video_share_frame']/@action").text
 
-      prepare_res = connect.post(action,{"url" => "http://www.youtube.com/watch?v=#{code}","act" => "parse_share", "from_host" => "vk.com", "mid" => connect.uid, "hash" => hash_prepare, "rhash" => rhash_prepare} )
+      prepare_res = connect.post(action,{"url" => "http://www.youtube.com/watch?v=#{code}","act" => "parse_share", "from_host" => "vk.com", "mid" => connect.uid, "hash" => hash_prepare, "rhash" => rhash_prepare},true )
       extra = prepare_res.scan(/extra\s*:\s*([^\,]+)/)[0][0]
       extra_data = prepare_res.scan(/extraData\s*:\s*\'([^\']+)/)[0][0]
       images = prepare_res.scan(/images\s*:\s*\[\'([^\']+)/)[0][0]
