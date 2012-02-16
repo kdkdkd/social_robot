@@ -12,7 +12,8 @@ require './settings.rb'
 require './updater.rb'
 require './logger_html.rb'
 require 'zip/zipfilesystem'
-
+require 'digest/md5'
+  
 require './data.rb'
 require './table.rb'
 require './table.rb'
@@ -43,7 +44,7 @@ end
 	
 
 class SocialRobot < Qt::MainWindow
-	slots    'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
+	slots    'check_blank_pic()','database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
 
 	#Create gui and set timer
 	def initialize()
@@ -854,6 +855,97 @@ class SocialRobot < Qt::MainWindow
 		ask(str => "files")[0]
 	end
 	
+	def check_blank_pic()
+		msgBox = Qt::MessageBox.new
+		transform_captcha = false
+		begin
+			transform_captcha = Vkontakte::transform_captcha
+		rescue
+		end
+		
+		convert_exe = false
+		begin
+			convert_exe = Vkontakte::convert_exe
+		rescue
+		end
+		
+		vcomp100 = false
+		begin
+			vcomp100 = Vkontakte::convert_exe.gsub(/convert\.exe$/,"vcomp100.dll")
+		rescue
+		end
+		
+		vcomp100_exist = false
+		begin
+			vcomp100_exist = File.exists?(vcomp100)
+		rescue
+		end
+		
+		
+		convert_exist = false
+		begin
+			convert_exist = File.exists?(Vkontakte::convert_exe)
+		rescue
+		end
+
+		digest = false		
+		if convert_exist
+			begin
+				incr_digest = Digest::MD5.new()
+				file = File.open(convert_exe, 'r')
+				file.each_line do |line|
+					incr_digest << line
+				end
+				digest = incr_digest.hexdigest
+			rescue
+			end
+		end
+		
+		digest_vcomp100 = false		
+		if vcomp100_exist
+			begin
+				incr_digest = Digest::MD5.new()
+				file = File.open(vcomp100, 'r')
+				file.each_line do |line|
+					incr_digest << line
+				end
+				digest_vcomp100 = incr_digest.hexdigest
+			rescue
+			end
+		end
+		
+		full_png = false
+		begin
+			full_png = File.expand_path("../../loot/captcha/#{@sid}.png")
+		rescue
+		end
+		
+		
+		full_jpg = false
+		begin
+			full_jpg = File.expand_path("../../loot/captcha/#{@sid}.jpg")
+		rescue
+		end
+		
+		
+		png_exist = false
+		begin
+			png_exist = File.exists?(full_png)
+		rescue
+		end
+		
+		jpg_exist = false
+		begin
+			jpg_exist = File.exists?(full_jpg)
+		rescue
+		end
+		
+		msgBox.setText("Преобразовать капчу: #{transform_captcha}\nКонвертер: #{convert_exe}\nКонвертер существует: #{convert_exist}\nmd5: #{digest}\nvcomp100: #{vcomp100}\nvcomp100 существует: #{vcomp100_exist}\nmd5: #{digest_vcomp100}\nsid: #{@sid}\nПуть к png:#{full_png}\nПуть к jpg:#{full_jpg}\nPng существует:#{png_exist}\nJpg существует:#{jpg_exist}")
+		msgBox.exec()
+	
+	
+	end
+	
 	#Create universal dialog thread unsafe
 	def ask_user_internal(params = {})
 		@timer.stop
@@ -867,9 +959,17 @@ class SocialRobot < Qt::MainWindow
 			param_label = nil
 			if param.class.name == "Hash"
 				if(param["type"]=="Image")
+					@sid = param["Path"]
 					pixmap = Qt::Pixmap.new("../../loot/captcha/#{param["Path"]}.png")
-					label = Qt::Label.new;
-					label.setPixmap(pixmap);
+					if(pixmap.height>0 && pixmap.width>0)
+						label = Qt::Label.new
+						label.setPixmap(pixmap)
+					else
+						label = Qt::PushButton.new("Почему пусто?",ask)
+						
+						connect(label,SIGNAL('clicked()'),self,SLOT('check_blank_pic()'))
+					end
+					
 				end
 			else
 				label = Qt::Label.new

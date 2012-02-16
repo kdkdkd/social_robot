@@ -151,6 +151,10 @@ module Vkontakte
 		@@transform_captcha=value
 	end
 
+	def transform_captcha
+		@@transform_captcha
+	end
+	
 	@@photo_mark_interval = 5
 	def photo_mark_interval=(value)
 		@@photo_mark_interval=value
