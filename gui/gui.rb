@@ -1,60 +1,172 @@
 ﻿$:.unshift File.dirname($0)
 
 require 'Qt'
-require '../lib/utfto1251.rb'
-require '../lib/vk.rb'
-require '../lib/captcha.rb'
-require './sugar_vk.rb'
+
 require './highlighter_ruby.rb'
 require 'pathname'
+
 require './help.rb'
 require './settings.rb'
+require './settings_window.rb'
 require './updater.rb'
-require './logger_html.rb'
+require './client.rb'
+require './task.rb'
 require 'zip/zipfilesystem'
-require 'digest/md5'
-  
+
 require './data.rb'
 require './table.rb'
-require './table.rb'
-
-include Vkontakte
-
-
-Vkontakte::application_directory = File.expand_path("../..")
+require 'socket'
+require 'json'
 
 
-$mutex = Mutex.new
+
 $db = nil
 
 $app = Qt::Application.new(ARGV)
 
-#Output message from system to console or log window
-def log(*args, &block)
-	@@log_block = block if block
-	@@log_block.call(*args) if defined?(@@log_block)
-end
+$client = nil
 
-
-#Show total on progress bar
-def show_progress(*args, &block)
-	@@log_total = block if block
-	@@log_total.call(*args) if defined?(@@log_total) && args.length>1
-end
-	
 
 class SocialRobot < Qt::MainWindow
-	slots    'check_blank_pic()','database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','stop_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
+	slots    'read()','connected()','delete_button_click()','stop_button_click()', 'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
 
+	def connected
+		
+	end
+	
+	def read
+		res = sender.readAll.to_s
+	
+		
+		@buffer += res
+		
+		split = @buffer.split("<!!MESSAGE!!>")
+        
+		if @buffer =~ /\<\!\!MESSAGE\!\!\>$/ 
+			@buffer = ""
+		else
+			@buffer = split.pop 
+		end
+		
+		split.each do |j|
+		  
+			next if j =~ /^\s*$/
+			j.force_encoding("UTF-8")
+			json = []
+			begin
+				json = JSON.parse(j)
+				
+			rescue
+				#puts "ERROR"
+			end
+			json.each do |r|
+				if(r["type"] == "update_name_choose_login")
+					update_name_choose_login
+					next
+				end
+				t = Task.find_id(r["id"])
+				if(t)
+				
+					if r["type"] == "log"
+						t.tab.append("<font color='black' size='3'>#{(r["text"]).force_encoding("UTF-8")}</font><br/>")
+					elsif r["type"] == "progress"
+						t.progress_text = r["text"]
+					elsif r["type"] == "state"
+						t.state = r["text"]
+					elsif r["type"] == "total"
+						t.progress_current = r["value"]
+						t.progress_total = r["range"]
+					elsif r["type"] == "ask"
+						send_data({:hash => ask(r["hash"]),:id => r["id"], :type=> :ask})
+					elsif r["type"] == "change_id"
+						t.id = r["to"]
+						
+						
+					end
+				end
+			end
+		end
+		
+	end
+	
+	def send_data(data)
+		@socket.write(data.to_json + "\n")
+		@socket.flush()
+		@socket.waitForBytesWritten(10000000)
+	end
+	
 	#Create gui and set timer
 	def initialize()
 		super
+		
+		#start server
+		@buffer = ""
+		server_script = File.expand_path("./server.rb")
+		ruby = File.expand_path("../../ruby/bin/ruby.exe")
+		arguments = []
+		arguments << server_script
+
+		server_process = Qt::Process.new
+
+		Settings["port"] = nil
+		Settings.save
+		server_process.start(ruby, arguments)
+
+		while true
+			Settings.reload
+			port = Settings["port"]
+			break if port
+			sleep 0.1
+		end
+		#$socket = TCPSocket.new 'localhost', port.to_i
+		@socket = Qt::TcpSocket.new
+		@socket.connectToHost('localhost',port.to_i)
+		connect(@socket,SIGNAL("connected()"),self,SLOT("connected()"))
+		connect(@socket,SIGNAL("readyRead()"),self,SLOT("read()"))
+		
+		
 		setWindowTitle("Социальный робот. " + IO.read("../version.txt"))
 		setWindowIcon(Qt::Icon.new("images/logo.png"))
 		#Create main widgets and dock interface 
-		resize(600, 600)
-		log_dock = Qt::DockWidget.new("Лог", self)
+		resize(800, 600)
+		all_tabs_dock = Qt::DockWidget.new("", self)
 		@help_dock = Qt::DockWidget.new("Помощь", self)
+		@all_tabs = Qt::TabWidget.new
+		@all_tabs.setTabPosition(1)
+		
+		
+
+		
+		@task_table = Qt::TableWidget.new
+		@task_table.setSelectionMode(0)
+		@task_table.horizontalHeader().setResizeMode(2);
+
+		@task_table.setColumnCount(7)
+
+		h = Qt::TableWidgetItem.new("Название")
+		@task_table.setHorizontalHeaderItem(0, h)
+
+		h = Qt::TableWidgetItem.new("");
+		@task_table.setHorizontalHeaderItem(1, h);
+
+		h = Qt::TableWidgetItem.new("");
+		@task_table.setHorizontalHeaderItem(2, h);
+
+
+		h = Qt::TableWidgetItem.new("Статус");
+		@task_table.setHorizontalHeaderItem(3, h);
+
+		h = Qt::TableWidgetItem.new("Прогресс");
+		@task_table.setHorizontalHeaderItem(4, h);
+
+		h = Qt::TableWidgetItem.new("Дата создания");
+		@task_table.setHorizontalHeaderItem(5, h);
+
+		h = Qt::TableWidgetItem.new("Сообщение");
+		@task_table.setHorizontalHeaderItem(6, h);
+
+
+
 
 		@code_edit = Qt::TextEdit.new
 		
@@ -64,26 +176,19 @@ class SocialRobot < Qt::MainWindow
 		@log_edit.openExternalLinks = false
 		@log_edit.openLinks = false
 
-
-		
-		@progress = Qt::ProgressBar.new
 		
 		@name_login_choose = Qt::ComboBox.new
+		
 		@name_login_text = Qt::Label.new
 		@name_login_text.text = "Кем выполнять действие"
 		update_name_login_choose()
 		
 		
 		
-		@progress_text = Qt::Label.new
-		@progress_text.text = ""
 
 		statusBar().insertPermanentWidget(1,@name_login_choose,0)
 		statusBar().insertPermanentWidget(0,@name_login_text,0)
 
-		
-		statusBar().insertPermanentWidget(0,@progress_text,0)
-		statusBar().insertPermanentWidget(1,@progress,0)
 
 
 		connect(@log_edit,SIGNAL('anchorClicked( const QUrl & )'),self,SLOT('link_clicked( const QUrl & )'))
@@ -91,6 +196,7 @@ class SocialRobot < Qt::MainWindow
 		@log_edit.setStyleSheet("QTextBrowser{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
 		@code_edit.setStyleSheet("QTextEdit{font: 15px;background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
 		@help_tree.setStyleSheet("QTreeWidget{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
+		@task_table.setStyleSheet("QTableWidget{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
 
 
 		#Properties of main widgets
@@ -105,16 +211,20 @@ class SocialRobot < Qt::MainWindow
 		setCentralWidget(@code_edit)
 
 		#Assign widgets to docks
-		log_dock.widget = @log_edit
-			addDockWidget(Qt::BottomDockWidgetArea, log_dock)
+		all_tabs_dock.widget = @all_tabs
+			addDockWidget(Qt::BottomDockWidgetArea, all_tabs_dock)
 		@help_dock.widget = @help_tree
 			addDockWidget(Qt::RightDockWidgetArea, @help_dock)
 
+    @all_tabs.addTab(@task_table,"Диспетчер задач")
+    @all_tabs.addTab(@log_edit,"Помощь")
+    
 
 
 		#Allow dock widgets to be movable
-		log_dock.Features = 2
+		all_tabs_dock.Features = 2
 		@help_dock.Features = 2
+    
 
 
 		#Fill help tree
@@ -203,10 +313,6 @@ class SocialRobot < Qt::MainWindow
 		@run_action.statusTip = "Запустить скрипт"
 		connect(@run_action, SIGNAL('triggered()'), self, SLOT('run_script()'))
 
-		@stop_action = Qt::Action.new(Qt::Icon.new("images/stop.png"), "Стоп", self)
-		@stop_action.statusTip = "Остановить скрипт"
-		connect(@stop_action, SIGNAL('triggered()'), self, SLOT('stop_script()'))
-
 		@loot_action = Qt::Action.new(Qt::Icon.new("images/loot.png"), "Скачанные файлы", self)
 		@loot_action.statusTip = "Посмотреть скачанные файлы"
 		connect(@loot_action, SIGNAL('triggered()'), self, SLOT('show_loot()'))
@@ -248,7 +354,6 @@ class SocialRobot < Qt::MainWindow
 		@fileMenu.addAction(@open_action)
 		
 		@fileMenu.addAction(@run_action)
-		@fileMenu.addAction(@stop_action)
 		@fileMenu.addAction(@loot_action)
 		@fileMenu.addAction(@developer_mode_action)
 		@fileMenu.addAction(@open_settings_action)
@@ -267,95 +372,91 @@ class SocialRobot < Qt::MainWindow
 
 		@run_toolbar = addToolBar("Run")
 		@run_toolbar.addAction(@run_action)
-		@run_toolbar.addAction(@stop_action)
 		@run_toolbar.addAction(@enter_action)
 
 
 		statusBar().showMessage("")
 
-		#Comunication variables
 
 		#Lines to add to log
-		@new_lines = []
-
-		#Status text to display
-		@new_progress_text = nil
-
-		#Percent of progress to display
-		@new_progress = nil
-
-		#Working thread
-		@thread = nil
-
-		#Disable stop button, enable start button
-		run_gui true
-
-		#Trigger to run_gui(true)
-		@disable_run_gui = false
+		@new_lines = Hash.new { |hash, key| hash[key] = [] }
 
 		#If code has changed
 		@changed = false
 		
 		#Proxy to call user gui dialog from script
-		@res_proxy = []
+		@res_proxy = {}
 		@ask_proxy = {}
-
-		#On iddle 
-		block = Proc.new do
-			if($mutex.try_lock)
-				if(@new_lines)
-					if(@new_lines.length>0)
-						lines_to_add = @new_lines[0..20]
-						@new_lines = @new_lines[21..@new_lines.length-1]
-						@new_lines = [] unless @new_lines
-						lines_to_add.each {|line| @log_edit.append(line)}
-					end
-				else
-					@new_lines = []
-				end
-
-				if @new_progress_text
-					@progress_text.text = @new_progress_text
-					@new_progress_text = nil
-				end
-
-				if @new_progress
-					@progress.setRange(1,@new_progress[1])
-					@progress.setValue(@new_progress[0])
-					@new_progress = nil
-				end
-
-				if(@disable_run_gui)
-					run_gui(true)
-					@disable_run_gui = false
-				end
-				$mutex.unlock
-			end
-			
-			
-			if @ask_proxy.length > 0
-				@res_proxy = ask_user_internal(@ask_proxy)
-				@ask_proxy = []
-			end
 		
-			Thread.pass
+		
+		@delete_buttons_tabs_hash = {}
+
+
+
+		#Update tasks
+		block_log_update = Proc.new do
+			update_tasks
 		end
-		
-		#Give chance to work for another threads  
-		@timer=Qt::Timer.new(window)
-		invoke=Qt::BlockInvocation.new(@timer, block, "invoke()")
-		Qt::Object.connect(@timer, SIGNAL("timeout()"), invoke, SLOT("invoke()"))
-		@timer.start
+		@timer_tasks_update=Qt::Timer.new(window)
+		invoke_tasks_update=Qt::BlockInvocation.new(@timer_tasks_update, block_log_update, "invoke()")
+		Qt::Object.connect(@timer_tasks_update, SIGNAL("timeout()"), invoke_tasks_update, SLOT("invoke()"))
+		@timer_tasks_update.start(5000)
 
-		log_ok("Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Или нажмите на кнопку <img src=\"images/vkontakte.png\"/> Это покажет Вас и Ваших друзей и абсолютно безобидно.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a>")
+		@log_edit.append("<font color='black' size='3'>Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Или нажмите на кнопку <img src=\"images/vkontakte.png\"/> Это покажет Вас и Ваших друзей и абсолютно безобидно.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a></font>")
 		
 		update_developer_mode()
 		
-		@threads = []
 
-		#Remember user input
-		@memory_input = {}
-	end
+
+
+       
+        waiting = $db[:atom].join_table(:inner, :task, :id=>:task_id).filter(:state => "waiting").to_a
+        waiting.uniq!{|x| x[:task_id]}
+		
+        #create tabs
+        waiting.each do |t|
+	    new_task = Task.new(t[:name], nil)
+	    new_task.id = 10000+t[:task_id]
+            res_tab = new_tab(t[:name],new_task)
+	    new_task.tab = res_tab
+	    
+            Task.add_task(new_task)
+            new_task.date_started = Time.parse(t[:date])
+        end
+        
+        #On iddle
+		#    block_task_update = Proc.new do
+		#	    Atom.next()
+		#    end
+
+		#@timer_task_update=Qt::Timer.new(window)
+		#invoke_task_update=Qt::BlockInvocation.new(@timer_task_update, block_task_update, "invoke()")
+		#Qt::Object.connect(@timer_task_update, SIGNAL("timeout()"), invoke_task_update, SLOT("invoke()"))
+		#@timer_task_update.start(5000)
+        @memory_input = {}
+  end
+
+
+  def new_tab(name,task)
+    #Create new tab
+		log_edit = Qt::TextBrowser.new
+		log_edit.openExternalLinks = false
+		log_edit.openLinks = false
+		log_edit.setStyleSheet("QTextBrowser{background-image: url(images/back.png);	background-repeat: repeat-xy; background-attachment: fixed;background-color: white;}")
+		log_edit.lineWrapMode = 0
+		log_edit.ReadOnly = true
+		@all_tabs.addTab(log_edit,name)
+		h = Qt::PushButton.new
+        h.flat = true
+        h.setIcon(Qt::Icon.new("images/delete.png"))
+
+        @delete_buttons_tabs_hash[h] = task
+        connect(h,SIGNAL("clicked(bool)"), self, SLOT("delete_button_click()"))
+        @all_tabs.tabBar.setTabButton(@all_tabs.tabBar.count - 1 ,1,h)
+	@all_tabs.currentIndex = @all_tabs.count - 1
+		connect(log_edit,SIGNAL('anchorClicked( const QUrl & )'),self,SLOT('link_clicked( const QUrl & )'))
+        log_edit
+  end
 	
 	def update_name_login_choose()
 		@name_login_choose.clear()
@@ -365,10 +466,12 @@ class SocialRobot < Qt::MainWindow
 	def database_peoples
 		AccountTable.new.show
 		update_name_login_choose()
+		update_options()
 	end
 	
 	def database_proxy
 		ProxyTable.new.show
+		update_options()
 	end
 	
 	#When user clics on link
@@ -440,11 +543,144 @@ class SocialRobot < Qt::MainWindow
 				
 			end
 		end
+  end
+
+  def stop_button_click()
+    task = @stop_buttons_hash[sender]
+    if task
+        task.state = "failed"
+	task.progress_text = "Остановлено пользователем"
+	
+	send_data({:id => task.id, :type => :stop})
+	sender.setEnabled(false)
+    end
+  end
+  
+  def delete_button_click()
+    task = @delete_buttons_table_hash[sender] || @delete_buttons_tabs_hash[sender]
+	
+    
+	  if(task)
+		
+		(0..@all_tabs.count - 1).each do |i| 
+			if @all_tabs.widget(i) == task.tab
+				@all_tabs.removeTab(i)
+				break
+			end
+		end
+		task.state = "failed"
+		task.progress_text = "Остановлено пользователем"
+		Task.remove(task.id)
+		send_data({:id => task.id, :type => :stop})
+	  end
+	 
+        
+   
+	
+  end
+
+  def update_tasks
+	
+	@delete_buttons_table_hash = {}
+	@stop_buttons_hash = {}
+	all_tasks = Task.all_tasks
+	all_tasks.sort!{|x,y| y.id <=> x.id }
+	@task_table.setRowCount(all_tasks.length)
+	all_tasks.each_with_index do |t,i|
+
+       add = ""
+       
+       progress_total = nil
+       progress_current = nil
+       
+       if(t.id>=10000)
+		progress_total = t.progress_total_database
+		progress_current = t.progress_current_database
+       else
+		add = "Сбор информации. "
+       end
+       
+       h = Qt::Label.new(add + t.name.to_s);
+       h.alignment = 132
+       h.margin = 20
+       @task_table.setCellWidget(i,0, h);
+
+       h = Qt::PushButton.new
+       h.flat = true
+       h.setIcon(Qt::Icon.new("images/stop.png"))
+       
+       h.setEnabled((t.state=="action") || (t.id>=10000 && progress_total != progress_current))
+       
+       @stop_buttons_hash[h] = t
+       connect(h,SIGNAL("clicked(bool)"), self, SLOT("stop_button_click()"))
+       @task_table.setCellWidget(i,1, h);
+
+	   
+	h = Qt::PushButton.new
+       h.flat = true
+       h.setIcon(Qt::Icon.new("images/delete.png"))
+       @delete_buttons_table_hash[h] = t
+       connect(h,SIGNAL("clicked(bool)"), self, SLOT("delete_button_click()"))
+       @task_table.setCellWidget(i,2, h);
+
+	  
+
+	   
+          
+       status = "?"
+	if(t.id>=10000)
+	 status = (progress_total==progress_current)? "Выполнен" : "Выполняется..."
+	else
+         case(t.state)
+           when "action" then status = "Выполняется..."
+           when "failed" then status = "Ошибка"
+           when "done" then status = "Выполнен"
+         end
+        end
+       h = Qt::Label.new(status)
+       h.alignment = 132
+       h.margin = 20
+       @task_table.setCellWidget(i,3, h)
+
+       if(t.id>=10000)
+		progress_text = "#{progress_current} / #{progress_total}"
+	else
+		progress_text = (!t.progress_total ||t.state == "done")? "-":"#{t.progress_current} / #{t.progress_total}"
 	end
+       
+
+
+       h = Qt::Label.new(progress_text);
+       h.alignment = 132
+       @task_table.setCellWidget(i,4, h);
+
+
+
+       h = Qt::Label.new(t.date_started.strftime("%Y-%m-%d %H:%M"));
+       h.alignment = 132
+       h.margin = 20
+       @task_table.setCellWidget(i,5, h);
+
+       
+        progress_note = t.progress_text.to_s
+       
+       h = Qt::Label.new(progress_note);
+       h.alignment = 132
+       h.margin = 20
+       @task_table.setCellWidget(i,6, h);
+
+       @task_table.horizontalHeader().resizeSections(3);
+    end
+  end
 	
 	#Open settings window
 	def open_settings
 		SettingsWindow.show
+		update_options()
+	end
+	
+	def update_options
+		send_data({:type=> :update_options})
 	end
 	
 	#Clicked on some auto generated menu
@@ -465,21 +701,13 @@ class SocialRobot < Qt::MainWindow
 		@code_edit.plainText = text
         @changed = false
 		if Settings["developer_mode"] == "false"
-			@thread.kill if @thread
-			@threads.each{|t| t.kill}
-			@threads = []
-			while @thread && @thread.alive? do
-				sleep 0.1
-			end
-			
-			run_gui(true)
-			run_script
+			run_script_name(str)
 		end
 	end
 	
 	#Open loot folder
 	def show_loot
-		path = Qt::Dir::toNativeSeparators(File.expand_path(Vkontakte::loot_directory));
+		path = Qt::Dir::toNativeSeparators(File.expand_path("../../loot"));
 		Qt::DesktopServices::openUrl(Qt::Url.new("file:///#{path}"));
 	end
 
@@ -487,61 +715,8 @@ class SocialRobot < Qt::MainWindow
 		Qt::DesktopServices::openUrl(Qt::Url.new("file:///#{path}"));
 	end
 
-	def notify
-		#open(File.expand_path("./sounds/notification.mp3"))
-	end
 
-	#Log with red color
-	def log_error(text)
-		text = text.to_s
-		text.force_encoding("UTF-8")
-		$mutex.lock
-			@new_lines << ("<font color='red' size='3'>" + text + "</font>")
-		$mutex.unlock
-	end
 
-	#Log with green color
-	def log_success(text)
-		text = text.to_s
-		text.force_encoding("UTF-8")
-		$mutex.lock
-			@new_lines << ("<font color='green' size='3'>" + text + "</font>")
-		$mutex.unlock
-	end
-
-	#Log with black color
-	def log_ok(text)
-		#text = text.to_s
-		#text.force_encoding("UTF-8")
-		if(text.class.name == "Array")
-			text_array = text
-		else
-			text = text.to_s
-			text.force_encoding("UTF-8")
-			text_array = [text]
-		end
-		$mutex.lock
-			text_array.each do |text_line|
-				@new_lines << "<font color='black' size='3'>" + text_line.to_s + "</font>"
-			end
-		$mutex.unlock
-	end
-
-	#show total on gui progress bar
-	def total(value,range)
-		$mutex.lock
-			@new_progress = [value,range]
-		$mutex.unlock
-	end
-
-	#Log with small grey font
-	def log_small(text)
-		text = text.to_s
-		text.force_encoding("UTF-8")
-		$mutex.lock
-			@new_lines << ("<font color='grey' size='3'>" + text + "</font>")
-		$mutex.unlock
-	end
 
 	#Ask if discard code edit changes or not
 	def check_changes
@@ -617,156 +792,39 @@ class SocialRobot < Qt::MainWindow
 		end
 	end
 
-	#On stop script clicked
-	def stop_script
-		@thread.kill if @thread
-		@threads.each{|t| t.kill}
-		@threads = []
-		run_gui(true)
-		@progress_text.text = "Остановлено"
-		@progress_text.setStyleSheet("QLabel { color : red; }");
-	end
-	
-	def set_disable_run_gui
-		$mutex.lock
-			@disable_run_gui = true
-		$mutex.unlock
-	end
+  def run_script()
+     run_script_name()
+  end
+  
+  
 
-	#Toggle start/stop buttons
-	def run_gui(enable)
-		@stop_action.setEnabled(!enable)
-		@run_action.setEnabled(enable)
-		@progress.visible = !enable
-		@name_login_choose.visible = enable
-		@name_login_text.visible = enable
-		@progress.setValue(1)
-	end
-	
-	def progress_text(text)
-		$mutex.lock
-			@new_progress_text = text
-		$mutex.unlock
-	end
-	
 	
 	
 	#On run script clicked
-	def run_script
-		return if @thread && @thread.alive?
-		$mutex.lock
-			@new_lines = []
-		$mutex.unlock
-		@log_edit.clear()
-		@progress_text.setStyleSheet("QLabel { color : black; }");
-		@progress_text.text = "Запуск..."
+	def run_script_name(name = 'Новый скрипт')
+		name_save = name
+		if name!="Новый скрипт"
+		  begin
+			name = IO.read(name.gsub(/\.rb$/,".name"))
+			name.force_encoding("UTF-8")
+		  rescue
+			name = name_save
+		  end
+		end
+		#Create new tab
+		new_task = Task.new(name,nil)
+		log_edit = new_tab(name,new_task)
+
 
 		s = @code_edit.plainText
 		s.force_encoding("UTF-8")
-		@thread = Thread.new(s,self) do |script,robot|
-			begin
-				log do |text|
-					robot.log_ok text
-				end
-				progress do |*args|
-					if(args.length==1)
-						text = args[0]
-						robot.progress_text(text)
-					else
-						robot.log_ok log_html(*args)
-					end
-				end
-				failed do |*args|
-					robot.log_error args[0]
-				end
-				show_progress do |value,range|
-					robot.total(value,range)
-				end
-				
-				update_session do |login,hash|
-					$db[:account].filter('email = ?', login).update(:hash => hash)
-				end
-				
-				ask_captcha	do |pict|
-					if(Settings["captcha_solver"] == "0")
-						res = ask({"type" => "Image", "Path" => pict} => "string")[0]
-					else
-						res = nil
-						
-						while(res.nil?)
-							
-							begin
-								progress "Sending captcha to antigate #{pict}..."
-								res = Antigate.solve(File.expand_path("../../loot/captcha/#{pict}.jpg"),Settings["antigate_key"])
-							rescue Exception => e
-								case e.message
-									when "ERROR_NO_SLOT_AVAILABLE" then res = nil; sleep 5
-									when "ERROR_CAPTCHA_UNSOLVABLE" then res = "asdas"
-									when "ERROR_BAD_DUPLICATES" then res = "asdas"
-									else progress(:exception_antigate,e); res = "asdas"; sleep 30;
-								end
-							end
-						end
-					end
-					res
-				end
-				
-				if(Settings["use_anonymizer"] == "true")
-					use_anonymizer
-				else
-					force_location
-				end
-				
-				
-				
-				if(Settings["use_proxy"] == "true")
-					Vkontakte::use_proxy = true
-					proxy_list = []
-					
-					$db[:proxy].each do |p| 
-						login = p[:login]
-						login = nil if(login && login.length == 0)
-						pass = p[:password]
-						pass = nil if(pass && pass.length == 0)
-						proxy_list.push([p[:server],p[:port],login,pass])
-					
-					end
-					Vkontakte::proxy_list = proxy_list
-				else
-					Vkontakte::use_proxy = false
-				end
-				
-				user_list = []
-				$db[:account].each{|acc| user_list.push([acc[:email],acc[:password]])}
-				user_list.uniq!{|a|a[0]}
-        Vkontakte::user_list = user_list
+		email = @name_login_choose.currentText
+		email.force_encoding("UTF-8")
+		send_data({:id => new_task.id, :eval => s, :type => :eval, :user => email, :name => name})
+		
+		new_task.tab = log_edit
+		Task.add_task(new_task)
 
-				Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
-				Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
-				Vkontakte.like_interval = Settings["like_interval"].to_f
-				Vkontakte.mail_interval = Settings["mail_interval"].to_f
-				Vkontakte.post_interval = Settings["post_interval"].to_f
-				Vkontakte.invite_interval = Settings["invite_interval"].to_f
-				Vkontakte.transform_captcha = Settings["captcha_solver"] == "0"
-        Vkontakte.user_login_interval = (Settings["login_interval"].nil?)? 4.0:Settings["login_interval"].to_f;
-				ask_login do 
-					me
-				end
-				eval(script)
-				progress "Выполнено"
-				#@progress_text.setStyleSheet("QLabel { color : green; }");
-				#@progress.setValue(0)
-				robot.set_disable_run_gui
-			rescue Exception => e  
-				robot.log_error e.message 
-				e.backtrace.each{|l|robot.log_small l} 
-				progress "Ошибка"
-				#@progress_text.setStyleSheet("QLabel { color : red; }");
-				#		@progress.setValue(0)
-				robot.set_disable_run_gui
-			end
-		end
-		run_gui(false)
 	end
 
 
@@ -776,179 +834,11 @@ class SocialRobot < Qt::MainWindow
 	end
 	
 	
-	#Create universal dialog
+	
+	
+
+	
 	def ask(params = {})
-		
-			@res_proxy = []
-			@ask_proxy = params
-		
-		while(true) do
-			
-			if(@res_proxy.length == 1 && @res_proxy[0].nil?)
-				raise "Отменено пользователем"
-			end
-			if(@res_proxy.length >0)
-				res = @res_proxy
-				@res_proxy = []
-				return res
-			end
-	
-			sleep 0.1
-		end
-	end
-	
-	#Shortcut to ask
-	def ask_string(str = "Введите строку")
-		ask(str => "string")[0]
-	end
-
-	#Shortcut to ask
-	def ask_text(str = "Введите текст")
-		ask(str => "text")[0]
-	end
-
-	def ask_peoples
-		r = ask(
-		 "Критерий(Имя или интерес)" => "string" ,
-		 "Искать по.." => {"Type" => "combo","Values" => ["По интересам","По имени"] },
-		 "Сортировать по.." => {"Type" => "combo","Values" => ["По рейтингу","По дате регистрации"] },
-		 "Страна" => {"Type" => "combo","Values" => ["Не важно"] + Vkontakte.countries.keys },
-		 "Город" => "string" ,
-		 "Количество результатов" => {"Type" => "int","Default" => 100, "Minimum" => 1 },
-		 "Начиная с..." => {"Type" => "int","Default" => 0, "Minimum" => 0, "Maximum" => 999 },
-		 "Пол"=>{"Type" => "combo","Values" => ["Не важно","Мужской","Женский"] },
-		 "Онлайн"=>{"Type" => "combo","Values" => ["Не важно","Только онлайн"] },
-		 "От"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a },
-		 "До"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a }
-		)
-
-		q = { }
-
-
-		q["Страна"] = r[3] if r[3] != "Не важно"
-		q["Город"] = r[4] if r[4].length>0
-
-		q["Пол"] = r[7] if r[7] != "Не важно"
-		q["Онлайн"] = "Да" if r[8] != "Не важно"
-		q["От"] =  r[9] if r[9] != "Не важно"
-		q["До"] =  r[10] if r[10] != "Не важно"
-		q["По имени"] =  (r[1] == "По имени")? "Да" : "Нет"
-		q["По дате"] =  (r[2] == "По дате регистрации")? "Да" : "Нет"
-
-
-		res = User.all(r[0],r[5],r[6],q)
-		res
-   end
-	
-	#Shortcut to ask
-    def ask_file(str = "Выберите файл")
-		ask(str => "file")[0]
-	end
-	
-	#Shortcut to ask
-    def ask_int(str = "Введите число")
-		ask(str => "int")[0]
-	end
-	
-	#Shortcut to ask
-    def ask_files(str = "Выберите файлы")
-		ask(str => "files")[0]
-	end
-	
-	def check_blank_pic()
-		msgBox = Qt::MessageBox.new
-		transform_captcha = false
-		begin
-			transform_captcha = Vkontakte::transform_captcha
-		rescue
-		end
-		
-		convert_exe = false
-		begin
-			convert_exe = Vkontakte::convert_exe
-		rescue
-		end
-		
-		vcomp100 = false
-		begin
-			vcomp100 = Vkontakte::convert_exe.gsub(/convert\.exe$/,"vcomp100.dll")
-		rescue
-		end
-		
-		vcomp100_exist = false
-		begin
-			vcomp100_exist = File.exists?(vcomp100)
-		rescue
-		end
-		
-		
-		convert_exist = false
-		begin
-			convert_exist = File.exists?(Vkontakte::convert_exe)
-		rescue
-		end
-
-		digest = false		
-		if convert_exist
-			begin
-				incr_digest = Digest::MD5.new()
-				file = File.open(convert_exe, 'r')
-				file.each_line do |line|
-					incr_digest << line
-				end
-				digest = incr_digest.hexdigest
-			rescue
-			end
-		end
-		
-		digest_vcomp100 = false		
-		if vcomp100_exist
-			begin
-				incr_digest = Digest::MD5.new()
-				file = File.open(vcomp100, 'r')
-				file.each_line do |line|
-					incr_digest << line
-				end
-				digest_vcomp100 = incr_digest.hexdigest
-			rescue
-			end
-		end
-		
-		full_png = false
-		begin
-			full_png = File.expand_path("../../loot/captcha/#{@sid}.png")
-		rescue
-		end
-		
-		
-		full_jpg = false
-		begin
-			full_jpg = File.expand_path("../../loot/captcha/#{@sid}.jpg")
-		rescue
-		end
-		
-		
-		png_exist = false
-		begin
-			png_exist = File.exists?(full_png)
-		rescue
-		end
-		
-		jpg_exist = false
-		begin
-			jpg_exist = File.exists?(full_jpg)
-		rescue
-		end
-		
-		msgBox.setText("Преобразовать капчу: #{transform_captcha}\nКонвертер: #{convert_exe}\nКонвертер существует: #{convert_exist}\nmd5: #{digest}\nvcomp100: #{vcomp100}\nvcomp100 существует: #{vcomp100_exist}\nmd5: #{digest_vcomp100}\nsid: #{@sid}\nПуть к png:#{full_png}\nПуть к jpg:#{full_jpg}\nPng существует:#{png_exist}\nJpg существует:#{jpg_exist}")
-		msgBox.exec()
-	
-	
-	end
-	
-	#Create universal dialog thread unsafe
-	def ask_user_internal(params = {})
-		@timer.stop
 		ask = Qt::Dialog.new
 		layout = Qt::GridLayout.new  
 		index = 0
@@ -957,20 +847,12 @@ class SocialRobot < Qt::MainWindow
 		label_hash = {}
 		params.each_key do |param| 
 			param_label = nil
-			if param.class.name == "Hash"
-				if(param["type"]=="Image")
-					@sid = param["Path"]
-					pixmap = Qt::Pixmap.new("../../loot/captcha/#{param["Path"]}.png")
-					if(pixmap.height>0 && pixmap.width>0)
-						label = Qt::Label.new
-						label.setPixmap(pixmap)
-					else
-						label = Qt::PushButton.new("Почему пусто?",ask)
-						
-						connect(label,SIGNAL('clicked()'),self,SLOT('check_blank_pic()'))
-					end
-					
-				end
+			if param =~ /^IMAGE/
+			    param_copy = param.gsub(/^IMAGE/,"")
+				pixmap = Qt::Pixmap.new("../../loot/captcha/#{param_copy}.png")
+				label = Qt::Label.new;
+				label.setPixmap(pixmap);
+				
 			else
 				label = Qt::Label.new
 				param_real = param.dup
@@ -1089,7 +971,7 @@ class SocialRobot < Qt::MainWindow
 		res_exec = ask.exec
 
 		if res_exec == 0
-			@timer.start
+
 			return [nil]
 		end
 		res = []
@@ -1123,7 +1005,6 @@ class SocialRobot < Qt::MainWindow
 
 		end
 		
-		@timer.start
 		res
 	end
 	
@@ -1147,99 +1028,8 @@ class SocialRobot < Qt::MainWindow
 		sender.parent.raise if sender.parent
 	end
 	
-	
-	#Access to User self object
-	def me
-		if @me && @name_login_choose.currentText == @me_login
-			return @me
-		else
-			@me = nil
-		end
-		
-		email = @name_login_choose.currentText
-		if(@name_login_choose.currentText && @name_login_choose.currentText.length>0)
-			email.force_encoding("UTF-8")
-			object = $db[:account][:email => email]
-			pass = object[:password]
-			hash = object[:hash]
-			@me = User.login(email,pass,hash)
-			raise "Не правильный логин/пароль" unless @me
-			@me_login = email
-		else
-			res = ask("Логин"=>"string","Пароль"=>"pass")
-			@me = User.login(res[0],res[1])
-			raise "Не правильный логин/пароль" unless @me
-			@me_login = res[0]
-			$db[:account].insert(:email => res[0], :password => res[1])
-			update_name_login_choose()
-		end
-		@me
-	end
-	
-	
-	def check_users
-		users = []
-		user_logins = []
-		user_list.each do |user|
-      next if user.nil?
-			hash = $db[:account][:email => user[0]][:hash]
-			u = safe{User.login(user[0],user[1],hash)}
-			if u
-				
-				users.push(u)
-				user_logins.push("#{user[0]}:#{user[1]}")
-				"Зашел #{user[0]}".print
-				
-			else
-				"Не зашел #{user[0]}".print
-			end
-
-		end
-		user_logins.print
-		users
-	end
 
 
-	
-	
-	#Asks to use anonymizer
-	def use_anonymizer
-		if @anonymizer 
-			force_location @anonymizer
-			return
-		end
-		agent = Mechanize.new
-		agent.user_agent_alias = 'Mac Safari'
-		page = agent.get "http://cameleo.ru/"
-		search_form = page.form :id => "proxy"
-		search_form.field_with(:name => "url").value = "vk.com"
-		search_results = agent.submit search_form
-		@anonymizer = "http://" + search_results.uri.host
-		force_location @anonymizer
-	end
-
-	def sub(original,friend)
-		message_actual = original.dup
-		message_actual.gsub!("$Имя",friend.firstname)
-		message_actual.gsub!("$ИмяФамилия",friend.name)
-		message_actual.gsub!(/\{([^\}]+)\}/)do |match|
-			match.gsub("{","").gsub("}","").split("|").sample
-		end
-		message_actual
-	end
-	
-	def aviable_text_features
-		"$Имя - имя пользователя\n$ИмяФамилия - Имя и фамилия пользователя\n{привет|здорово|хай} - теги"
-	end
-	
-	
-	def add_thread(thread)
-		@threads<<thread
-	end
-	
-	def join_threads
-		@threads.each{|t|t.join}
-	end
 end
 
 
@@ -1279,6 +1069,10 @@ unless(new_version)
 		File.delete(splash)
 	end
 	
+	
+	
+	
+	
 	$app.exec
 else
     Dir.chdir File.join(File.expand_path("../.."),"#{new_version}/gui/")
@@ -1286,7 +1080,7 @@ else
 	system_command = "\"#{File.join(File.expand_path("../.."),"ruby/bin/rubyw.exe")}\" -r \"#{File.join(File.expand_path("../.."),"#{new_version}/gui/gui.rb")}\""
 	
 	system(system_command)
-	puts "end"
+
 end
 
 

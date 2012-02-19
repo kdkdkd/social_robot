@@ -143,18 +143,21 @@ module Vkontakte
   def user_login_interval=(value)
       @@user_login_interval=value
   end
+
+  def user_login_interval
+      @@user_login_interval
+  end
   
 	@@last_user_login = nil
+  def last_user_login
+     @@last_user_login
+  end
 
 	@@transform_captcha = false
 	def transform_captcha=(value)
 		@@transform_captcha=value
 	end
 
-	def transform_captcha
-		@@transform_captcha
-	end
-	
 	@@photo_mark_interval = 5
 	def photo_mark_interval=(value)
 		@@photo_mark_interval=value
@@ -168,6 +171,9 @@ module Vkontakte
 	@@mail_interval = 3
 	def mail_interval=(value)
 		@@mail_interval=value
+  end
+  def mail_interval
+		@@mail_interval
 	end
 	
 	@@post_interval = 4
@@ -297,11 +303,15 @@ module Vkontakte
 		def initialize(login = nil, password = nil)
 			 new_agent
 			
-			if(@@use_proxy)
+			if(@@use_proxy && @@proxy_list.length>0)
 			    found_proxy = false
 				proxy_list_small = @@proxy_list
 				while(!found_proxy)
 					current_proxy = proxy_list_small.sample
+					if(current_proxy.nil?)
+						new_agent
+						break
+					end
           progress :try_proxy,current_proxy[0]
 					if current_proxy
 						begin
@@ -517,7 +527,7 @@ module Vkontakte
 				diff = Time.new - @@last_user_login 
 				sleep(@@user_login_interval - diff) if(diff<@@user_login_interval)
 			end
-
+      @@last_user_login  = Time.new
       #check captcha
 			login_hash = {'op'=>'a_login_attempt','login' => @email}
 			captcha_sid = nil
@@ -549,7 +559,7 @@ module Vkontakte
       "email"=> @email,"pass"=> @@utf_converter.encode(@password),"expire"=>""
       })
 
-        @@last_user_login  = Time.new
+
 
         @agent.cookies.each do |cookie|
 					@cookie_login = cookie if cookie.name == "remixsid"
@@ -1046,9 +1056,9 @@ module Vkontakte
 			self
 		end
 		
-		def User.id(id_set)
+		def User.id(id_set,connect=nil)
 			res = User.new.set(id_set)
-			res.connect = forсe_login(nil)
+			res.connect = forсe_login(connect)
 			res
 		end
 		
@@ -1215,7 +1225,7 @@ module Vkontakte
 			chas = post_decodehash[0]
 			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
 			chas.reverse!
-
+      sleep @@mail_interval
 			captcha_sid = nil
 			captcha_key = nil
 			while true

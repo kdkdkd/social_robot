@@ -5,10 +5,10 @@ Sequel::Model.plugin :force_encoding, 'UTF-8'
 
 class RobotDatabase
 
-	@@maximum_migration = 3
+	@@maximum_migration = 5
 	
 	def initialize(database_name)
-		@db = Sequel.sqlite(database_name)
+		@db = Sequel.connect(:adapter=>'sqlite', :database =>database_name, :timeout=>99999999)
 		migration_present = @db["SELECT * FROM sqlite_master WHERE type='table'"].map(:tbl_name).include?("migration")
 		unless migration_present
 			@db.create_table(:migration) do
@@ -44,6 +44,36 @@ class RobotDatabase
 					String :password
 					String :hash
 					String :name
+        end
+
+      when 4 then
+				@db.create_table(:task) do
+					primary_key :id
+					String :name, :text=>true
+					String :date
+          Integer :priority
+        end
+
+      when 5 then
+				@db.create_table(:atom) do
+					primary_key :id
+					String :name
+          String :from
+          String :to
+          String :param0, :text=>true
+          String :param1, :text=>true
+          String :param2, :text=>true
+          String :param3, :text=>true
+          String :param4, :text=>true
+          String :param5, :text=>true
+          String :param6, :text=>true
+          String :param7, :text=>true
+          String :param8, :text=>true
+          String :param9, :text=>true
+          Integer :attempts
+          String :state
+          Integer :task_id
+          String :error, :text=>true
 				end
 		end
 	
