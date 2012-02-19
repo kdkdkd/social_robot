@@ -9,7 +9,7 @@ require './help.rb'
 require './settings.rb'
 require './settings_window.rb'
 require './updater.rb'
-require './client.rb'
+
 require './task.rb'
 require 'zip/zipfilesystem'
 
