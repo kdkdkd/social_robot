@@ -1,3 +1,5 @@
+require 'mechanize'
+
 class Updater
 	def last_version
 		return @last_version if @last_version
