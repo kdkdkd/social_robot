@@ -102,7 +102,7 @@ class SocialRobot < Qt::MainWindow
 		#start server
 		@buffer = ""
 		server_script = File.expand_path("./server.rb")
-		ruby = File.expand_path("../../ruby/bin/ruby.exe")
+		ruby = File.expand_path("../../ruby/bin/rubyw.exe")
 		arguments = []
 		arguments << server_script
 
