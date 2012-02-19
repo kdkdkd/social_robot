@@ -61,7 +61,7 @@ class SocialRobot < Qt::MainWindow
 			end
 			json.each do |r|
 				if(r["type"] == "update_name_choose_login")
-					update_name_choose_login
+					update_name_login_choose
 					next
 				end
 				t = Task.find_id(r["id"])
@@ -819,6 +819,7 @@ class SocialRobot < Qt::MainWindow
 		s = @code_edit.plainText
 		s.force_encoding("UTF-8")
 		email = @name_login_choose.currentText
+		email = "" unless email
 		email.force_encoding("UTF-8")
 		send_data({:id => new_task.id, :eval => s, :type => :eval, :user => email, :name => name})
 		
