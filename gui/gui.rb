@@ -57,7 +57,7 @@ class SocialRobot < Qt::MainWindow
 				json = JSON.parse(j)
 				
 			rescue
-				#puts "ERROR"
+				puts "ERROR"
 			end
 			json.each do |r|
 				if(r["type"] == "update_name_choose_login")
@@ -79,6 +79,7 @@ class SocialRobot < Qt::MainWindow
 					elsif r["type"] == "ask"
 						send_data({:hash => ask(r["hash"]),:id => r["id"], :type=> :ask})
 					elsif r["type"] == "change_id"
+					puts "change_id",r 
 						t.id = r["to"]
 						
 						
@@ -557,7 +558,7 @@ class SocialRobot < Qt::MainWindow
   end
   
   def delete_button_click()
-    task = @delete_buttons_table_hash[sender] || @delete_buttons_tabs_hash[sender]
+    task = @delete_buttons_tabs_hash[sender] || @delete_buttons_table_hash[sender] 
 	
     
 	  if(task)
@@ -1050,8 +1051,8 @@ unless(new_version)
 		$db = data.db
 		
 	#rescue
-	
-	
+		$db[:atom].filter(:state => "action").update(:state => "waiting")	
+		puts $db[:atom].filter(:state => "action").count
 	end
 
 	widget = SocialRobot.new

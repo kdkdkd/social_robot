@@ -359,7 +359,7 @@ Settings.save
 client = server.accept
 
 $logger.info "CONNECTED"
-$db[:atom].filter(:state => "action").update(:state => "waiting")
+
 Atom.create_workers
 
 

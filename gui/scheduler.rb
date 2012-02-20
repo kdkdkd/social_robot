@@ -10,12 +10,13 @@ class Atom
 
   #Set status to waiting or failed
   def failed(error)
-    attempts = $db[:atom][:id => id][:attempts]
-    if(attempts<3)
-      $db[:atom].filter('id = ?', id).update(:state => "waiting" , :attempts => attempts + 1, :error => error)
-    else
-      $db[:atom].filter('id = ?', id).update(:state => "failed", :error => error)
-    end
+    #attempts = $db[:atom][:id => id][:attempts]
+    #if(attempts<3)
+     # $db[:atom].filter('id = ?', id).update(:state => "waiting" , :attempts => attempts + 1, :error => error)
+    #else
+    #  $db[:atom].filter('id = ?', id).update(:state => "failed", :error => error)
+    #end
+	$db[:atom].filter('id = ?', id).update(:state => "failed", :error => error)
   end
 
   #Set status to done
@@ -25,6 +26,7 @@ class Atom
 
   #Set status to action
   def action
+	$logger.info "ACTIONs #{self}"
     $db[:atom].filter('id = ?', id).update(:state => "action")
   end
 
@@ -194,6 +196,7 @@ class Atom
 				$atom_mutex.synchronize{ 
 					atom = Atom.next()
 					if atom
+						$logger.info "ATOM #{atom}"
 						atom.action 
 					end
 				}
@@ -205,7 +208,7 @@ class Atom
 					begin
 						atom.execute
 					rescue Exception => e
-						e.message.print
+						$logger.error "ERROR on atom execute #{e.message}"
 					end
 				end
 				sleep 0.5
