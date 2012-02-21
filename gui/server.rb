@@ -360,7 +360,9 @@ client = server.accept
 
 $logger.info "CONNECTED"
 
-Atom.create_workers
+
+
+Atom.start_action
 
 
 $logger.info "CONNECTED"

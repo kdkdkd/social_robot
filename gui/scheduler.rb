@@ -26,13 +26,12 @@ class Atom
 
   #Set status to action
   def action
-	$logger.info "ACTIONs #{self}"
-    $db[:atom].filter('id = ?', id).update(:state => "action")
+	$db[:atom].filter('id = ?', id).update(:state => "action")
   end
 
   #execute self
   def execute()
-    #action
+    action
 	
     user_from = safe{Users.user(from)}
 	if(!user_from)
@@ -45,8 +44,8 @@ class Atom
     end
    
 
-
-    case(name)
+    
+    case(name.to_s)
       when "send_mail" then
         param1 = nil if param1 && param1.length == 0
         param2 = nil if param2 && param2.length == 0
@@ -81,36 +80,8 @@ class Atom
   end
 
   
-  #Allowed atoms in that moment
-  @@cache = []
-  
-  #Last time search shows empty values
-  @@last_time_was_empty = nil
-  
   def Atom.next()
 		
-			not_ready_to_search = false
-			
-				if(@@last_time_was_empty && Time.now - @@last_time_was_empty < 3)
-					not_ready_to_search = true
-				end
-			
-			
-			return nil if(not_ready_to_search)
-			
-			res = nil
-			
-			
-				res = @@cache.sample
-				if(res)
-					@@cache.delete(res)
-					res = Atom.new(res[:id])
-				end
-			
-			
-			return res if res
-			
-			
 			waiting = $db[:atom].filter(:state => "waiting").to_a
 
 
@@ -119,9 +90,7 @@ class Atom
 			#Remove all, that don't have access
 			user_list = Users.user_list
 			waiting = waiting.find_all{|w| user_list.find{|u| u[0] == w[:from] && u[2]}}
-			if(waiting.length == 0)
-				@@last_time_was_empty = Time.now
-			end
+			
 			
 			
 			#Remove all, that action takes place
@@ -157,68 +126,26 @@ class Atom
 
 
 			#If action can't be done yet
-
 			waiting.uniq! {|s| s[:from]}
-			
-			
-			
-			
-			
-			res = nil
-			 
-				@@cache = waiting
-				res = @@cache.sample
-				if(res)
-					@@cache.delete(res)
-					res = Atom.new(res[:id])
+			waiting.each do |w|
+				Thread.new(w[:id],w[:task_id]) do |id,task_id|
+					Thread.current["id"] = task_id + 10000
+					atom = Atom.new(id)
+					$logger.info "ACTION INFO #{atom}"
+					atom.execute()
 				end
-			
-			return res
-		
-		
-
-
-		
-
+			end
   end
   
   
-  @@workers = []
   
-  def Atom.create_workers
-    $logger.info "CREATE"
-	25.times{
-		thread = Thread.new do
-			while true
-			
-				
-				atom = nil
-				$atom_mutex.synchronize{ 
-					atom = Atom.next()
-					if atom
-						$logger.info "ATOM #{atom}"
-						atom.action 
-					end
-				}
-				
-				
-				if(atom)
-					Thread.current["id"] = atom.task_id + 10000
-					"Выполняю задание #{atom.id}".print
-					begin
-						atom.execute
-					rescue Exception => e
-						$logger.error "ERROR on atom execute #{e.message}"
-					end
-				end
-				sleep 0.5
-				
-			end	
+  def Atom.start_action
+    Thread.new do
+		while true
+			Atom.next
+			sleep 1
 		end
-		thread.priority = -2
-		@@workers<<thread
-	}
-  
+	end
   end
 
 
