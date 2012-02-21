@@ -78,11 +78,6 @@ class SocialRobot < Qt::MainWindow
 						t.progress_total = r["range"]
 					elsif r["type"] == "ask"
 						send_data({:hash => ask(r["hash"]),:id => r["id"], :type=> :ask})
-					elsif r["type"] == "change_id"
-					puts "change_id",r 
-						t.id = r["to"]
-						
-						
 					end
 				end
 			end
@@ -217,8 +212,8 @@ class SocialRobot < Qt::MainWindow
 		@help_dock.widget = @help_tree
 			addDockWidget(Qt::RightDockWidgetArea, @help_dock)
 
-    @all_tabs.addTab(@task_table,"Диспетчер задач")
-    @all_tabs.addTab(@log_edit,"Помощь")
+		@all_tabs.addTab(@task_table,"Диспетчер задач")
+		@all_tabs.addTab(@log_edit,"Помощь")
     
 
 
@@ -411,29 +406,8 @@ class SocialRobot < Qt::MainWindow
 
 
        
-        waiting = $db[:atom].join_table(:inner, :task, :id=>:task_id).filter(:state => "waiting").to_a
-        waiting.uniq!{|x| x[:task_id]}
-		
-        #create tabs
-        waiting.each do |t|
-	    new_task = Task.new(t[:name], nil)
-	    new_task.id = 10000+t[:task_id]
-            res_tab = new_tab(t[:name],new_task)
-	    new_task.tab = res_tab
-	    
-            Task.add_task(new_task)
-            new_task.date_started = Time.parse(t[:date])
-        end
         
-        #On iddle
-		#    block_task_update = Proc.new do
-		#	    Atom.next()
-		#    end
-
-		#@timer_task_update=Qt::Timer.new(window)
-		#invoke_task_update=Qt::BlockInvocation.new(@timer_task_update, block_task_update, "invoke()")
-		#Qt::Object.connect(@timer_task_update, SIGNAL("timeout()"), invoke_task_update, SLOT("invoke()"))
-		#@timer_task_update.start(5000)
+        
         @memory_input = {}
   end
 
@@ -588,20 +562,10 @@ class SocialRobot < Qt::MainWindow
 	all_tasks.sort!{|x,y| y.id <=> x.id }
 	@task_table.setRowCount(all_tasks.length)
 	all_tasks.each_with_index do |t,i|
+    
 
-       add = ""
        
-       progress_total = nil
-       progress_current = nil
-       
-       if(t.id>=10000)
-		progress_total = t.progress_total_database
-		progress_current = t.progress_current_database
-       else
-		add = "Сбор информации. "
-       end
-       
-       h = Qt::Label.new(add + t.name.to_s);
+       h = Qt::Label.new(t.name.to_s);
        h.alignment = 132
        h.margin = 20
        @task_table.setCellWidget(i,0, h);
@@ -610,7 +574,7 @@ class SocialRobot < Qt::MainWindow
        h.flat = true
        h.setIcon(Qt::Icon.new("images/stop.png"))
        
-       h.setEnabled((t.state=="action") || (t.id>=10000 && progress_total != progress_current))
+       h.setEnabled(t.state=="action")
        
        @stop_buttons_hash[h] = t
        connect(h,SIGNAL("clicked(bool)"), self, SLOT("stop_button_click()"))
@@ -629,25 +593,19 @@ class SocialRobot < Qt::MainWindow
 	   
           
        status = "?"
-	if(t.id>=10000)
-	 status = (progress_total==progress_current)? "Выполнен" : "Выполняется..."
-	else
+	
          case(t.state)
            when "action" then status = "Выполняется..."
            when "failed" then status = "Ошибка"
            when "done" then status = "Выполнен"
          end
-        end
        h = Qt::Label.new(status)
        h.alignment = 132
        h.margin = 20
        @task_table.setCellWidget(i,3, h)
 
-       if(t.id>=10000)
-		progress_text = "#{progress_current} / #{progress_total}"
-	else
+      
 		progress_text = (!t.progress_total ||t.state == "done")? "-":"#{t.progress_current} / #{t.progress_total}"
-	end
        
 
 
@@ -1051,8 +1009,7 @@ unless(new_version)
 		$db = data.db
 		
 	#rescue
-		$db[:atom].filter(:state => "action").update(:state => "waiting")	
-		puts $db[:atom].filter(:state => "action").count
+		
 	end
 
 	widget = SocialRobot.new

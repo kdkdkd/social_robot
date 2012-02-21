@@ -10,16 +10,7 @@ class Task
     @@id
   end
   
-  def progress_total_database
-     $db[:atom].join_table(:inner, :task, :id=>:task_id).filter(:task_id=>id - 10000).count
-  end
 
-  def progress_current_database
-     
-  
-     $db[:atom].join_table(:inner, :task, :id=>id - 10000).filter(:task_id=>id - 10000,:state => ["done","failed"]).count
-	
-  end
 
   def initialize(name, tab)
     @name = name

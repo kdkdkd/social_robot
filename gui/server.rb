@@ -9,7 +9,7 @@ require '../lib/captcha.rb'
 require './sugar_vk.rb'
 require './logger_html.rb'
 require './data.rb'
-require './scheduler.rb'
+require './users.rb'
 
 #database initialization
 data = RobotDatabase.new(File.join(File.expand_path("../.."),"data/data.db"))
@@ -330,17 +330,25 @@ def total(value,range)
 	}
 end
 
-def task
-	task_database_id = Thread.current["id"]
-	return TaskDatabase.new(task_database_id - 10000) if task_database_id>=10000
-	task_database_id = $db[:task].insert(:name=>Thread.current["name"],:date=>Time.now.to_s,:priority=>0) + 10000
-	
-	$mutex.synchronize{
-		$res<<{:id=>Thread.current["id"],:to=>task_database_id, :type => "change_id"}
-	}
-	Thread.current["id"] = task_database_id
-	TaskDatabase.new(task_database_id - 10000)
-	
+def thread
+	thread = Thread.new(Thread.current["id"]) do |id|
+		Thread.stop
+		yield
+	end
+	thread["id"] = Thread.current["id"]
+	thread["join"] = true
+	sleep 0.1 while thread.status != 'sleep'
+	thread.wakeup
+
+end
+
+def join
+	Thread.list.each do |t| 
+		if ((t["id"].to_s == Thread.current["id"].to_s) && (t["join"].to_s == "true"))
+			t.join 
+		end
+	end
+			
 end
 
 
@@ -360,10 +368,6 @@ client = server.accept
 
 $logger.info "CONNECTED"
 
-Atom.create_workers
-
-
-$logger.info "CONNECTED"
 
 $res = []
 
@@ -426,12 +430,7 @@ loop do
 		sleep 0.1 while thread.status != 'sleep'
 		thread.wakeup
 	elsif task_json["type"] == "stop"
-		thread = Thread.list.find{|t| t["id"].to_s == task_json["id"].to_s}
-		thread.kill if(thread)
-		id = task_json["id"].to_i
-		if(id>10000)
-			$db[:atom].filter(:state => "waiting",:task_id => id - 10000).update(:state => "failed")
-		end
+		Thread.list.each{|t| t.kill if t["id"].to_s == task_json["id"].to_s}
 	elsif task_json["type"] == "ask"
 		thread = Thread.list.find{|t| t["id"].to_s == task_json["id"].to_s}
 		thread["result_ask"] = task_json["hash"]

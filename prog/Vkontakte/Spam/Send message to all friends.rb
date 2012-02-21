@@ -24,10 +24,8 @@ friends.each_with_index do |friend,index|
    title_actual = sub(title,friend)
    
    #Шлем сообщение другу
-   task.mail(message_actual,me.email,friend.id,media[0],media[1],media[2],title_actual)
+   friend.mail(message_actual,media[0],media[1],media[2],title_actual)
 
    #Обновляем прогресс бар
    total(index,friends.length)
 end
-
-flush
