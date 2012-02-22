@@ -5,12 +5,12 @@ ar = $db[:proxy].to_a
 res = ask("адрес каритнки" => "string", "реферер" => "string")
 
 
-
+agents = ['Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.10.229 Version/11.61'] + (Mechanize::AGENT_ALIASES.keys - ['Mechanize']).map{|x| Mechanize::AGENT_ALIASES[x].dup}
 
 i = 0
 while true
-	agent_browser =  (Mechanize::AGENT_ALIASES.keys - ['Mechanize']).sample.dup
-	agent = Mechanize.new{ |agent|  agent.user_agent_alias =agent_browser}
+	agent_browser =  agents.sample
+	agent = Mechanize.new{ |agent|  agent.user_agent = agent_browser}
 	agent.request_headers["Referer"]=res[1]
 
 	safe{
