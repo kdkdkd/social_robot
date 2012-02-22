@@ -1,6 +1,6 @@
 ar = $db[:proxy].to_a
 
-agent = Mechanize.new
+agent = Mechanize.new{ |agent|  agent.user_agent_alias = 'Mac Safari'	}
 res = ask("адрес каритнки" => "string", "реферер" => "string")
 
 agent.request_headers["Referer"]=res[1]
