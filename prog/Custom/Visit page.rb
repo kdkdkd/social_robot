@@ -1,15 +1,22 @@
+
 ar = $db[:proxy].to_a
 
-agent = Mechanize.new{ |agent|  agent.user_agent_alias = 'Mac Safari'	}
+
 res = ask("адрес каритнки" => "string", "реферер" => "string")
 
-agent.request_headers["Referer"]=res[1]
 
 
 
 i = 0
 while true
+	agent_browser =  (Mechanize::AGENT_ALIASES.keys - ['Mechanize']).sample.dup
+	agent = Mechanize.new{ |agent|  agent.user_agent_alias =agent_browser}
+	agent.request_headers["Referer"]=res[1]
+
 	safe{
+		
+		
+		server = ""
 		if(ar.length>0 && Settings["use_proxy"] == "true")
 			server = ar[i][:server]
 			port = ar[i][:port]
@@ -22,7 +29,7 @@ while true
 			agent.set_proxy(server,port.to_i,login,pass)
 		end
 		agent.get(res[0])
-		"Зашел".print
+		"Зашел как #{agent_browser} #{server}".print
 		if(ar.length>0 && Settings["use_proxy"] == "true")
 			server.print
 		end
