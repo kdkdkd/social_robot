@@ -1293,7 +1293,7 @@ module Vkontakte
 					
 					if captcha_sid.to_i == 8
 						connect.able_to_send_message = false
-						progress :able_to_send_message,self
+						progress :able_to_send_message,connect
 						return
 					end
 					captcha_key = connect.ask_captcha_internal(captcha_sid)

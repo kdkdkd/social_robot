@@ -4,9 +4,6 @@ title = result_ask[0][0]
 message = result_ask[0][1]
 
 
-total_index = 0
-current_index = 0
-
 total_all = 0
 current_all =0
 
@@ -31,7 +28,7 @@ check_users do |user|
    				title_actual = sub(title,friend)
    
 				#Шлем сообщение другу
-   				friend.mail(message_actual,true,media[0],media[1],media[2],title_actual)
+   				safe{friend.mail(message_actual,true,media[0],media[1],media[2],title_actual)}
 
 				current_all += 1
 

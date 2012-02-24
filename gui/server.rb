@@ -330,10 +330,11 @@ def total(value,range)
 	}
 end
 
-def thread
-	thread = Thread.new(Thread.current["id"]) do |id|
+def thread(*params)
+	
+	thread = Thread.new(*params) do |*p|
 		Thread.stop
-		yield
+		yield(*p)
 	end
 	thread["id"] = Thread.current["id"]
 	thread["join"] = true
