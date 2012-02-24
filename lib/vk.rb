@@ -281,18 +281,14 @@ module Vkontakte
 	
 	class Connect
 		attr_reader :uid
-		attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite
+		attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message
+		
 		
 		def cookie
 			@cookie_login
 		end
 		
-		def login_from_cookie(cookie)
-			@cookie_login = Mechanize::Cookie.new("remixsid", cookie)
-			@cookie_login.domain = ".vk.com"
-			@cookie_login.path = "/"
-			check_login(nil)
-		end
+
 		
 		def new_agent
       @agent = Mechanize.new { |agent|  agent.user_agent_alias = 'Mac Safari'	}
@@ -301,6 +297,7 @@ module Vkontakte
     end
 
 		def initialize(login = nil, password = nil)
+			 @able_to_send_message = true
 			 new_agent
 			
 			if(@@use_proxy && @@proxy_list.length>0)
@@ -432,7 +429,9 @@ module Vkontakte
 		def get(href)
 			begin
 				res = @agent.get(addr(href),[],nil,{'cookie' => @cookie_login}).body
-			rescue
+			rescue Exception => e
+				e.message.print
+				href.print
 				return nil
 			end
 			res.force_encoding("cp1251")
@@ -517,7 +516,22 @@ module Vkontakte
 		end
 		
 		
-	
+	def update_cookies
+		remixoldmail = Mechanize::Cookie.new("remixoldmail", "1")
+		remixoldmail.domain = ".vk.com"
+		remixoldmail.path = "/"
+		remixap = Mechanize::Cookie.new("remixap", "1")
+		remixap.domain = ".vk.com"
+		remixap.path = "/"
+		remixchk = Mechanize::Cookie.new("remixchk", "5")
+		remixchk.domain = ".vk.com"
+		remixchk.path = "/"
+		remixdt = Mechanize::Cookie.new("remixdt", "0")
+		remixdt.domain = ".vk.com"
+		remixdt.path = "/"
+		@cookie_login = [remixoldmail,@cookie_login,remixchk].join(";")
+		
+	end
 
     def login
       return true if @cookie_login
@@ -566,9 +580,13 @@ module Vkontakte
 				end
 
 				if @cookie_login
+					
+					
+					
 					id = check_login(@email)
 					if(id)
 						update_session(@email,@cookie_login.value)
+						update_cookies
 						progress "Done login"
 						@uid = id
 
@@ -600,7 +618,12 @@ module Vkontakte
 			res
 		end
 		
-		
+		def Connect.decode_chas(post_decodehash)
+			chas = post_decodehash
+			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
+			chas.reverse!
+			chas
+		end
 	end
 	
 	class Music
@@ -973,7 +996,7 @@ module Vkontakte
 		
 		
 		def User.get_id_by_user_page(resp)
-			resp.scan(/\"user_id\"\:\"?([^\"]*)\"?/)[0][0]
+			resp.scan(/\'?\"?user_id\"?\'?\:\'?\"?([^\"\,\']*)\"?\'?/)[0][0]
 		end
 		
 		def User.get_id_by_feed(resp)
@@ -1212,24 +1235,36 @@ module Vkontakte
 		end
 
 		
-		def mail(message, attach_photo = nil, attach_video = nil, attach_music = nil, title = "",connector=nil)
+		def mail(message, friends = true, attach_photo = nil, attach_video = nil, attach_music = nil, title = "",connector=nil)
 			connect = forсe_login(connector,@connect)
-
+			
+			return if(!friends && !connect.able_to_send_message)
+			
 			if(connect.last_user_mail)
 				diff = Time.new - connect.last_user_mail
 				sleep(@@mail_interval - diff) if(diff<@@mail_interval)
 			end
+			
+			
 			progress "Mailing #{@id}..."
-			post_decodehash = connect.post('/al_mail.php', {"act" => "write_box", "al" => "1", "to" => id}).scan(/cur.decodehash\(\'([^\']*)\'/)[0]
-			return unless post_decodehash
-			chas = post_decodehash[0]
-			chas = (chas[chas.length - 5,5] + chas[4,chas.length - 12])
-			chas.reverse!
-      sleep @@mail_interval
+			
+			get = connect.get("/write#{id}")
+	
+			hash_get = get.scan(/\"?\'?hash\"?\'?\s*\:\s*\"?\'?([^\"\']+)\"\'?/)[0]
+			extra_hash_get = get.scan(/\"?\'?extra_hash\"?\'?\s*\:\s*\"?\'?([^\"\']+)\"\'?/)[0]
+			
+			
+			return unless hash_get
+			return unless extra_hash_get
+			
+			hash_get = Connect.decode_chas(hash_get[0])
+			extra_hash_get = Connect.decode_chas(extra_hash_get[0])
+			
+			sleep @@mail_interval
 			captcha_sid = nil
 			captcha_key = nil
 			while true
-				hash = {"act" => "a_send","al" => "1", "ajax" => "1", "from" => "box", "chas" => chas, "message" => message, "title" => title, "media" => "" , "to_id" => id }
+				hash = {"act" => "a_send","al" => "1", "chas" => hash_get, "extra_chas" => extra_hash_get, "from" => "write", "message" => message, "title" => title, "to_ids" => id }
 				was_attach = false
 				if(attach_photo)
 					hash["media"] = "photo:#{attach_photo}"
@@ -1250,17 +1285,23 @@ module Vkontakte
 					hash["captcha_key"] = captcha_key
 				end
 				res = connect.post('/al_mail.php', hash)
-				if(res.index("<div"))
+				if(res.index("/mail"))
 					break
 				else
 					a = res.split("<!>")
 					captcha_sid = a[a.length-2]
-					break if captcha_sid.to_i < 100
+					
+					if captcha_sid.to_i == 8
+						connect.able_to_send_message = false
+						progress :able_to_send_message,self
+						return
+					end
 					captcha_key = connect.ask_captcha_internal(captcha_sid)
 				end
 			end
 			progress :user_mail,self,message
 			connect.last_user_mail = Time.new
+			return
 		end
 		
 		

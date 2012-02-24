@@ -42,6 +42,9 @@
    when :ok_proxy then res = "Прокси подходит #{args[1]}"
    when :bad_proxy then res = "Прокси не подходит #{args[1]}"
    when :need_phone then res = "Нужен телефон"
+   
+   when :able_to_send_message then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит сообщений"
+   
    end
    res.to_s
 end

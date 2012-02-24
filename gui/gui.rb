@@ -114,7 +114,7 @@ class SocialRobot < Qt::MainWindow
 			break if port
 			sleep 0.1
 		end
-		#$socket = TCPSocket.new 'localhost', port.to_i
+		
 		@socket = Qt::TcpSocket.new
 		@socket.connectToHost('localhost',port.to_i)
 		connect(@socket,SIGNAL("connected()"),self,SLOT("connected()"))
@@ -815,6 +815,7 @@ class SocialRobot < Qt::MainWindow
 				
 			else
 				label = Qt::Label.new
+				label.setTextInteractionFlags(1)
 				param_real = param.dup
 				param_label = param_real.dup
 				param_real.force_encoding("UTF-8")

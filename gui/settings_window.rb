@@ -78,6 +78,7 @@ class SettingsWindow < Qt::Dialog
 
 
     window.antigate_key_label = Qt::Label.new
+	window.antigate_key_label.setTextInteractionFlags(1)
 		window.antigate_key_label.text = "Ключ api. Можно узнать тут:\nhttp://antigate.com/panel.php?action=showkey"
 		layout.addWidget(window.antigate_key_label,8,0)
 		window.antigate_key_textbox = Qt::LineEdit.new

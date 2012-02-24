@@ -31,7 +31,7 @@ check_users do |user|
    				title_actual = sub(title,friend)
    
 				#Шлем сообщение другу
-   				friend.mail(message_actual,media[0],media[1],media[2],title_actual)
+   				friend.mail(message_actual,true,media[0],media[1],media[2],title_actual)
 
 				current_all += 1
 

@@ -41,7 +41,7 @@ peoples.each_with_index do |people,index|
    title_actual = sub(title,people)
    
    #Отослать сообщение
-   safe{people.mail(message_actual,photo,video,music,title_actual)}
+   safe{people.mail(message_actual,false,photo,video,music,title_actual)}
 
    #Обновить прогресс бар
    total(index,peoples.length)
