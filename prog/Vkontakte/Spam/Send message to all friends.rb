@@ -6,6 +6,7 @@ names_all = friends.map{|friend| friend.name}
 
 #Если друзей слишком много - отсеиваем
 c = names_all.length / 100
+c = 1 if c==0
 names = []
 names_all.each_with_index{|friend_name,i| names << friend_name if i%c == 0}
 
