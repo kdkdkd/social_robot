@@ -1216,14 +1216,22 @@ module Vkontakte
 					xml = Nokogiri::HTML(@connect.post("/albums#{id}",hash_params).split("<!>").find{|x| x.index "<div"})
 				end
 				add_to_length = 0
-
+				
+				
+				
+				
 				current_res = xml.xpath("//div[@class='cont']/a").inject([]) do |array,a|
 					album_delete_hash = nil
 					
-          new_album_id = a["href"].scan(/_(\d+)/)[0][0]
-          add_to_length -= 1 if (new_album_id == "0" || new_album_id == "00")
-          new_album_name = a.xpath(".//div[@class='ge_photos_album fl_l']").text
-					array.push(Album.new.set(self,new_album_id,new_album_name,album_delete_hash,connect))
+					new_album_id = a["href"].scan(/_(\d+)/)[0]
+					if(new_album_id)
+						new_album_id = new_album_id[0]
+						add_to_length -= 1 if (new_album_id == "0" || new_album_id == "00")
+						new_album_name = a.xpath(".//div[@class='ge_photos_album fl_l']").text
+						array.push(Album.new.set(self,new_album_id,new_album_name,album_delete_hash,connect))
+					else
+						add_to_length -= 1
+					end
 					array
 				end
 				break if current_res.length + add_to_length == 0
