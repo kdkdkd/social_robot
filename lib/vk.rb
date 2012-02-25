@@ -1671,7 +1671,9 @@ module Vkontakte
 		    href = href.split("?").first
 			id_complex = href.split("/album").last.split("_")
 			user = User.id(id_complex.first)
-			user.albums.find{|x| x.id == id_complex.last}
+			res = user.albums.find{|x| x.id == id_complex.last}
+      		res || Album.new.set(user,id_complex.last,"",nil,user.connect)
+
 		end
 		
 		
