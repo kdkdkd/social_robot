@@ -1,11 +1,16 @@
 #Получить список друзей
 friends = me.friends
 
-#�?мена друзей
-names = friends.map{|friend| friend.name}
+#Имена друзей
+names_all = friends.map{|friend| friend.name}
+
+#Если друзей слишком много - отсеиваем
+c = names_all.length / 100
+names = []
+names_all.each_with_index{|friend_name,i| names << friend_name if i%c == 0}
 
 #Спросить, какое сообщение отправлять
-result_ask = ask_media("Тема" => "string" , "Сообщение.\n\n#{aviable_text_features}" => "text", "�?мя друга с которого начать"=>{"Type" => "combo","Values" => names })
+result_ask = ask_media("Тема" => "string" , "Сообщение.\n\n#{aviable_text_features}" => "text", "Имя друга с которого начать"=>{"Type" => "combo","Values" => names })
 title = result_ask[0][0]
 message = result_ask[0][1]
 media = parse_media(result_ask[1],me)
