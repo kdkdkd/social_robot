@@ -14,7 +14,7 @@ peoples.each_with_index do |user,i|
         next if skype.nil?
 
        #Вывести skype
-       {skype => user}.print if(skype.length>=10)
+       "#{skype} => #{user.pretty_string}".print if(skype.length>=10)
     
        #Update progress bar
        total(i,peoples.length)
