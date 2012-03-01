@@ -1580,7 +1580,7 @@ module Vkontakte
          res_post = @connect.post("/al_gifts.php",{"act"=>"get_money","al"=>"1"})
          html_text = res_post.split("<!>").find{|x| x.index("<div")}
          html = Nokogiri::HTML(html_text)
-         text = html.xpath("//div[@class = 'payments_summary_cont']").text
+		 text = html.xpath("//div[@class = 'payments_summary_cont']").text.gsub(/[^\d]/,"")
          text.to_i
     end
 

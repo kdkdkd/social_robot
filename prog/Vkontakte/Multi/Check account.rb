@@ -1,7 +1,12 @@
 user_logins = []
 user_info = []
 
-additional_info = ask("Получать дополнительную информацию?\nДрузья, Количество голосов"=>"check")[0]
+res = ask("Получать дополнительную информацию?\nДрузья, Количество голосов"=>"check",
+                            "Выводть только аккаунты, которые не требуют проверки телефона"=>"check"
+)
+
+additional_info = res[0]
+show_limmited = res[1]
 
 
 #Каждым пользователем
@@ -11,7 +16,7 @@ user_list.each_with_index do |user,i|
 	u = safe{User.login(user[0],user[1])}
 	if !u.nil?
 		info = "#{user[0]}:#{user[1]}"
-		user_logins.push(info)
+		user_logins.push(info) if u || !show_limmited
 		allinfo = "?:?"
 		
 		#Грузим информацию о пользователе
