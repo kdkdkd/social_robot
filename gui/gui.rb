@@ -1052,11 +1052,11 @@ end
 
 
 new_version = nil
-#begin
-	#new_version = Updater.new.update
-#rescue
+begin
+	new_version = Updater.new.update
+rescue
 		
-#end
+end
 
 unless(new_version)
 
