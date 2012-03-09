@@ -261,7 +261,7 @@ class Hash
 			print_indentation_xm = x.print_indentation
 			print_indentation_ym = y.print_indentation
 			
-			y.print_indentation = 0;
+			y.print_indentation = 0
 			
 			
 			add = false

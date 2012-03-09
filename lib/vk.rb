@@ -1007,8 +1007,12 @@ module Vkontakte
 		def User.get_post_hash(resp)
 			resp.scan(/\"post_hash\"\:\"([^\"]*)\"/)[0][0]
 		end
-		
-		def id
+
+    def id_raw
+     @id
+    end
+
+    def id
 			return nil if @id.nil?
 			@id = @id.to_s
 			return @id if @id =~ /^\d+$/
@@ -1405,37 +1409,83 @@ module Vkontakte
 			@connect.post('/al_friends.php', {"act" => "remove", "al" => "1", "mid" => id, "hash" => friend_hash})
 			@connect = connect_old
 			progress :user_uninvite,self
-		end
+    end
 
-		def User.force_all(query = '', hash_qparams = {}, connector=nil)
+    def User.can_divide_hash(hash_qparams)
+      from =  hash_qparams["От"] || 12
+      to =  hash_qparams["До"] || 80
+      sex = hash_qparams["Пол"]
+      month = hash_qparams["Месяц рождения"]
+      day = hash_qparams["День рождения"]
+			from != to || sex.nil? || month.nil? || day.nil?
+    end
+    def User.divide_hash(hash_qparams)
+      from =  hash_qparams["От"] || 12
+      to =  hash_qparams["До"] || 80
+      sex = hash_qparams["Пол"]
+      month = hash_qparams["Месяц рождения"]
+      day = hash_qparams["День рождения"]
+			if(from != to)
+        split = (to - from) /2
+			  hash1 = hash_qparams.clone
+			  hash1["От"] = from
+			  hash1["До"] = from + split
+			  hash2 = hash_qparams.clone
+			  hash2["От"] = from + split + 1
+			  hash2["До"] = to
+        return [hash1,hash2]
+      elsif sex.nil?
+        hash1 = hash_qparams.clone
+			  hash1["Пол"] = "Мужской"
+			  hash2 = hash_qparams.clone
+			  hash2["Пол"] = "Женский"
+        return [hash1,hash2]
+      elsif month.nil?
+        res = []
+        (1..12).each{|m|hash1 = hash_qparams.clone;hash1["Месяц рождения"] = m;res<<hash1}
+        return res
+      elsif day.nil?
+        res = []
+        (1..[nil, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month]).each{|d|hash1 = hash_qparams.clone;hash1["День рождения"] = d;res<<hash1}
+        return res
+
+      else
+        return []
+      end
+    end
+
+
+
+
+		def User.force_all_searches(query = '', size = 50, hash_qparams = {}, connector=nil)
+      if(size<=1000) || !User.can_divide_hash(hash_qparams)
+        res_total = [{"params" => hash_qparams,"size" => size}]
+        return res_total
+      end
+
 
 			res = User.all_offset(query,0,hash_qparams,connector,true)
 			sleep 1
-			from =  hash_qparams["От"] || 12
-			to =  hash_qparams["До"] || 80
-			progress "Searching users #{query} age #{from}-#{to} ..."
+			progress "Searching users #{query} length #{res[3]}..."
 			if(res[3].nil?)
 				return []
 			elsif(res[3] == 0)
 				sleep 1
 				return []
-			elsif(res[3]<1000 || from == to)
-				sleep 10
-				ret =  User.all(query, 1000, 0, hash_qparams)
-				return ret
+			elsif(res[3]<=1000)
+        sleep 1
+  		  #ret =  User.all(query, res[3], 0, hash_qparams)
+        ret = [{"params" => hash_qparams,"size" => res[3]}]
+			  return ret
+
 			end
 
-			split = (to - from) /2
-			hash1 = hash_qparams.clone
-			hash1["От"] = from
-			hash1["До"] = from + split
-			hash2 = hash_qparams.clone
-			hash2["От"] = from + split + 1
-			hash2["До"] = to
-			res1 = User.force_all(query,hash1,connector)
-			res2 = User.force_all(query,hash2,connector)
-			res1 + res2
+			res_total = []
 
+      User.divide_hash(hash_qparams).each do |hash_divided|
+        res_total +=(User.force_all_searches(query,size - res_total.length,hash_divided,connector))
+      end
+      res_total
 		end
 		
 		def User.all(query = '', size = 50, offset = 0, hash_qparams = {}, connector=nil)
@@ -1503,6 +1553,9 @@ module Vkontakte
 			qhash["c[name]"] = (hash_qparams["По имени"] == "Да")? "1":"0"
 			qhash["c[sort]"] = "1" if (hash_qparams["По дате"] == "Да")
 			qhash["c[group]"] = (hash_qparams["Группа"]) if (hash_qparams["Группа"])
+      qhash["c[month]"] = hash_qparams["Месяц рождения"] if hash_qparams["Месяц рождения"]
+      qhash["c[day]"] = hash_qparams["День рождения"] if hash_qparams["День рождения"]
+
 			
 			res = nil
 			seconds_sleep = 50
@@ -1542,7 +1595,8 @@ module Vkontakte
 					return [res_array,json_has_more,json_offset,json_length]
 				end
 				return  [[],false,0,nil] if(seconds_sleep>1000)
-				sleep seconds_sleep
+				progress "sleep #{seconds_sleep}"
+        sleep seconds_sleep
 				seconds_sleep *= 4
 			end
 		end
@@ -1580,7 +1634,7 @@ module Vkontakte
          res_post = @connect.post("/al_gifts.php",{"act"=>"get_money","al"=>"1"})
          html_text = res_post.split("<!>").find{|x| x.index("<div")}
          html = Nokogiri::HTML(html_text)
-		 text = html.xpath("//div[@class = 'payments_summary_cont']").text.gsub(/[^\d]/,"")
+         text = html.xpath("//div[@class = 'payments_summary_cont']").text.gsub(/[^\d]/,"")
          text.to_i
     end
 

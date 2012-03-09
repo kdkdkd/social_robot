@@ -85,6 +85,7 @@ class Users
    			users.push(u)
   			"Зашел #{user[0]}".print
         yield u
+
 			else
 				"Не зашел #{user[0]}".print
 			end

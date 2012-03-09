@@ -37,7 +37,7 @@ check_users do |user|
 			end
 		
 		end
-
+		
 end
 
 join

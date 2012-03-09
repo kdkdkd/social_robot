@@ -17,7 +17,7 @@ peoples.each_with_index do |user,i|
           phone.gsub!(/[^\d]/,"")
 
          #Запомнить телефон, если в нем содержится достаточно букв
-         "#{phone} => #{user.pretty_string}".print if(phone.length>=10)
+         {phone => user}.print if(phone.length>=10)
     
          #Update progress bar
          total(i,peoples.length)

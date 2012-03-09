@@ -46,7 +46,7 @@ check_users do |user_out|
 				break unless user.connect.able_to_send_message
 			end
 		end
-
+		
 end
 
 join

@@ -28,7 +28,7 @@ $client = nil
 
 
 class SocialRobot < Qt::MainWindow
-	slots    'read()','connected()','delete_button_click()','stop_button_click()', 'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
+	slots   'database_lists()', 'read()','connected()','delete_button_click()','stop_button_click()', 'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
 
 	def connected
 		
@@ -68,7 +68,7 @@ class SocialRobot < Qt::MainWindow
 				if(t)
 				
 					if r["type"] == "log"
-						t.tab.append("<font color='black' size='3'>#{(r["text"]).force_encoding("UTF-8")}</font><br/>")
+						t.tab.append("<font color='black' size='3'>#{(r["text"]).to_s.force_encoding("UTF-8")}</font><br/>")
 					elsif r["type"] == "progress"
 						t.progress_text = r["text"]
 					elsif r["type"] == "state"
@@ -76,8 +76,9 @@ class SocialRobot < Qt::MainWindow
 					elsif r["type"] == "total"
 						t.progress_current = r["value"]
 						t.progress_total = r["range"]
-					elsif r["type"] == "ask"
-						send_data({:hash => ask(r["hash"]),:id => r["id"], :type=> :ask})
+          elsif r["type"] == "ask"
+            ask_res = ask(r["hash"])
+						send_data({:hash => ask_res,:id => r["id"], :type=> :ask})
 					end
 				end
 			end
@@ -326,9 +327,14 @@ class SocialRobot < Qt::MainWindow
 		@enter_action.statusTip = "Вход в систему"
 		connect(@enter_action, SIGNAL('triggered()'), self, SLOT('enter_system()'))
 
-		@database_peoples = Qt::Action.new("Аккаунты", self)
+		@database_peoples = Qt::Action.new(Qt::Icon.new("images/user.png"),"Аккаунты", self)
 		@database_peoples.statusTip = "Редактировать аккаунты"
 		connect(@database_peoples, SIGNAL('triggered()'), self, SLOT('database_peoples()'))
+
+
+    @database_lists = Qt::Action.new(Qt::Icon.new("images/list.png"),"Списки", self)
+		@database_lists.statusTip = "Редактировать списки"
+		connect(@database_lists, SIGNAL('triggered()'), self, SLOT('database_lists()'))
 		
 		@database_proxy = Qt::Action.new("Прокси", self)
 		@database_proxy.statusTip = "Редактировать прокси сервера"
@@ -355,6 +361,7 @@ class SocialRobot < Qt::MainWindow
 		@fileMenu.addAction(@open_settings_action)
 		@fileMenu.addAction(@database_peoples)
 		@fileMenu.addAction(@database_proxy)
+    @fileMenu.addAction(@database_lists)
 		@fileMenu.addAction(@exit_action)
 		
 		generate_menu(menuBar(),'../prog')
@@ -411,6 +418,9 @@ class SocialRobot < Qt::MainWindow
         @memory_input = {}
   end
 
+  def database_lists
+    UserTable.show
+  end
 
   def new_tab(name,task)
     #Create new tab
@@ -685,6 +695,7 @@ class SocialRobot < Qt::MainWindow
 		msgBox.setInformativeText("Все равно продолжить?")
 		msgBox.setStandardButtons(Qt::MessageBox::Ok | Qt::MessageBox::Cancel)
 		msgBox.setDefaultButton(Qt::MessageBox::Cancel)
+    msgBox.setWindowIcon(Qt::Icon.new("images/logo.png"))
 		res = msgBox.exec() == Qt::MessageBox::Ok
 		@changed = false if res
 		res
@@ -798,137 +809,179 @@ class SocialRobot < Qt::MainWindow
 	
 
 	
-	def ask(params = {})
+	def ask(params_in = {})
+    #map control to tab number
+    tabs_hash = {}
 		ask = Qt::Dialog.new
-		layout = Qt::GridLayout.new  
-		index = 0
+    ask.setWindowIcon(Qt::Icon.new("images/logo.png"))
 		controls = []
 		@controls_hash = {}
 		label_hash = {}
-		params.each_key do |param| 
-			param_label = nil
-			if param =~ /^IMAGE/
-			    param_copy = param.gsub(/^IMAGE/,"")
-				pixmap = Qt::Pixmap.new("../../loot/captcha/#{param_copy}.png")
-				label = Qt::Label.new;
-				label.setPixmap(pixmap);
-				
-			else
-				label = Qt::Label.new
-				label.setTextInteractionFlags(1)
-				param_real = param.dup
-				param_label = param_real.dup
-				param_real.force_encoding("UTF-8")
-				label.text = param_real
-			end
-			value_hash = params[param]
-			input = nil
-			default = @memory_input[param_label]
-			if(value_hash.class.name == "Hash")
-				if value_hash["Type"] == "combo"
-					input = Qt::ComboBox.new
+    tabbed = params_in["tab"]
 
-					selected_item_index = -1
-					value_hash["Values"].each_with_index{|x,i|input.insertItem(i,x.to_s);selected_item_index = i if x.to_s == default.to_s}
-					input.setCurrentIndex(selected_item_index) if selected_item_index>=0
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				elsif value_hash["Type"] == "int"
-					input = Qt::SpinBox.new
-					input.minimum = value_hash["Minimum"] if value_hash["Minimum"]
+    layout_global = Qt::VBoxLayout.new
 
-					input.maximum = 99999
-					input.maximum = value_hash["Maximum"] if value_hash["Maximum"]
-					input.value = value_hash["Default"] if value_hash["Default"]
+    if(tabbed)
+      params_list = params_in.values.inject({}){|a,x|a[x["data"]]=x["name"];a}
+      tabs = Qt::TabWidget.new
+      layout_global.addWidget(tabs)
+    else
+      params_list = {params_in => nil}
+      tabs = nil
+    end
 
-					input.value = default if(default && default.class.name == "Fixnum")
 
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				end
-			else
+    params_list.keys.each do |params|
 
-			case value_hash
-				when "check"
-					input = Qt::CheckBox.new
-					input.checked = default == true
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				when "text"
-					input = Qt::TextEdit.new
+      layout = Qt::GridLayout.new
 
-					input.plainText = default.to_s if(default)
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				when "string"
-					input = Qt::LineEdit.new
-					input.text = default.to_s if(default)
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				when "int"
-					input = Qt::SpinBox.new
-					input.minimum = 0
-					input.maximum = 99999
-					input.value = 1
-					input.value = default if(default && default.class.name == "Fixnum")
 
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				when "pass"
-					input = Qt::LineEdit.new
-					input.EchoMode = Qt::LineEdit::Password
+      widget_for_layout = Qt::Widget.new
+      widget_for_layout.setLayout(layout)
+      if(tabs)
+        tabs.addTab(widget_for_layout, params_list[params] )
 
-					controls.push(input)
-					layout.addWidget(input,index,1)
-				when "files"
-					hlayout = Qt::HBoxLayout.new
-					input = Qt::LineEdit.new
-					button = Qt::PushButton.new
-					@controls_hash[button] = input
-					button.text = "..."
-					input.text = default.to_s if(default)
-					hlayout.addWidget(input)
+      else
+        layout_global.addWidget(widget_for_layout)
+      end
+      if(params == "USERLIST")
+        usertable = UserTable.new
+        tabs_hash[usertable] = tabs.count - 1 if tabbed
+        layout.addWidget(usertable)
+        controls << usertable
+      else
+        index = 0
+        layout.setContentsMargins(10,10,10,10)
+		    layout.HorizontalSpacing = 75
+		    layout.VerticalSpacing = 10
+        params.each_key do |param|
+          param_label = nil
+          if param =~ /^IMAGE/
+              param_copy = param.gsub(/^IMAGE/,"")
+            pixmap = Qt::Pixmap.new("../../loot/captcha/#{param_copy}.png")
+            label = Qt::Label.new;
+            label.setPixmap(pixmap);
 
-					hlayout.addWidget(button)
-					connect(button,SIGNAL('clicked()'),self,SLOT('open_files_clicked()'))
-					controls.push(button)
-					layout.addLayout(hlayout,index,1)
-				when "file"
-					hlayout = Qt::HBoxLayout.new
-					input = Qt::LineEdit.new
-					button = Qt::PushButton.new
-					@controls_hash[button] = input
-					button.text = "..."
-					input.text = default.to_s if(default)
-					hlayout.addWidget(input)
-					hlayout.addWidget(button)
-					connect(button,SIGNAL('clicked()'),self,SLOT('open_file_clicked()'))
-					controls.push(input)
-					layout.addLayout(hlayout,index,1)
-				else
-					input = Qt::LineEdit.new
-					input.text = default.to_s if(default)
-				end
-			end
-			label_hash[input] = param_label if(!param_label.nil? && !input.nil?)
-			
-			
-			
-			layout.addWidget(label,index,0)
-			
-			
-			index += 1
-		end
-		exit_button = Qt::PushButton.new("Ок",ask)
-		layout.addWidget(exit_button,index,1,Qt::AlignRight)
+          else
+            label = Qt::Label.new
+            label.setTextInteractionFlags(1)
+            param_real = param.dup
+            param_label = param_real.dup
+            param_real.force_encoding("UTF-8")
+            label.text = param_real
+          end
+          value_hash = params[param]
+          input = nil
+          default = @memory_input[param_label]
+          if(value_hash.class.name == "Hash")
+            if value_hash["Type"] == "combo"
+              input = Qt::ComboBox.new
+
+              selected_item_index = -1
+              value_hash["Values"].each_with_index{|x,i|input.insertItem(i,x.to_s);selected_item_index = i if x.to_s == default.to_s}
+              input.setCurrentIndex(selected_item_index) if selected_item_index>=0
+              controls.push(input)
+              layout.addWidget(input,index,1)
+            elsif value_hash["Type"] == "int"
+              input = Qt::SpinBox.new
+              input.minimum = value_hash["Minimum"] if value_hash["Minimum"]
+
+              input.maximum = 99999
+              input.maximum = value_hash["Maximum"] if value_hash["Maximum"]
+              input.value = value_hash["Default"] if value_hash["Default"]
+
+              input.value = default if(default && default.class.name == "Fixnum")
+
+              controls.push(input)
+              layout.addWidget(input,index,1)
+            end
+          else
+
+          case value_hash
+            when "check"
+              input = Qt::CheckBox.new
+              input.checked = default == true
+              controls.push(input)
+              layout.addWidget(input,index,1)
+            when "text"
+              input = Qt::TextEdit.new
+
+              input.plainText = default.to_s if(default)
+              controls.push(input)
+              layout.addWidget(input,index,1)
+            when "string"
+              input = Qt::LineEdit.new
+              input.text = default.to_s if(default)
+              controls.push(input)
+              layout.addWidget(input,index,1)
+            when "int"
+              input = Qt::SpinBox.new
+              input.minimum = 0
+              input.maximum = 99999
+              input.value = 1
+              input.value = default if(default && default.class.name == "Fixnum")
+
+              controls.push(input)
+              layout.addWidget(input,index,1)
+            when "pass"
+              input = Qt::LineEdit.new
+              input.EchoMode = Qt::LineEdit::Password
+
+              controls.push(input)
+              layout.addWidget(input,index,1)
+            when "files"
+              hlayout = Qt::HBoxLayout.new
+              input = Qt::LineEdit.new
+              button = Qt::PushButton.new
+              @controls_hash[button] = input
+              button.text = "..."
+              input.text = default.to_s if(default)
+              hlayout.addWidget(input)
+
+              hlayout.addWidget(button)
+              connect(button,SIGNAL('clicked()'),self,SLOT('open_files_clicked()'))
+              controls.push(button)
+              layout.addLayout(hlayout,index,1)
+            when "file"
+              hlayout = Qt::HBoxLayout.new
+              input = Qt::LineEdit.new
+              button = Qt::PushButton.new
+              @controls_hash[button] = input
+              button.text = "..."
+              input.text = default.to_s if(default)
+              hlayout.addWidget(input)
+              hlayout.addWidget(button)
+              connect(button,SIGNAL('clicked()'),self,SLOT('open_file_clicked()'))
+              controls.push(input)
+              layout.addLayout(hlayout,index,1)
+            else
+              input = Qt::LineEdit.new
+              input.text = default.to_s if(default)
+            end
+          end
+          label_hash[input] = param_label if(!param_label.nil? && !input.nil?)
+          tabs_hash[input] = tabs.count - 1 if tabbed
+
+
+          layout.addWidget(label,index,0)
+
+
+          index += 1
+        end
+
+      end
+
+    end
+
+    exit_button = Qt::PushButton.new("Ок",ask)
+		layout_global.addWidget(exit_button,0,2)
+    exit_button.setMaximumSize(Qt::Size.new(150, 100))
 		connect(exit_button,SIGNAL('clicked()'),ask,SLOT('accept()'))
 		
 		
-		layout.setContentsMargins(50,50,50,50)
-		layout.HorizontalSpacing = 75
-		layout.VerticalSpacing = 30
+
 		ask.windowTitle = "Введите значения"
-		ask.setLayout(layout)
+		ask.setLayout(layout_global)
 		res_exec = ask.exec
 
 		if res_exec == 0
@@ -938,34 +991,38 @@ class SocialRobot < Qt::MainWindow
 		res = []
 		controls.each do |control|
 
-			case control.class.name
-			when /TextEdit/
-				push_value = (control.plainText)
-				push_value.force_encoding("UTF-8")
-				res.push(push_value)
-			when /LineEdit/
-				push_value = (control.text)
-				push_value.force_encoding("UTF-8")
-				res.push(push_value)
-			when /SpinBox/
-				res.push(control.value)
-			when /PushButton/
-				text = @controls_hash[control].text
-				text.force_encoding("UTF-8")
-				res.push(text.split("|"))
-			when /ComboBox/
-				text = control.currentText
-				text.force_encoding("UTF-8")
-				res.push(text)
-			when /CheckBox/
-				res.push(control.checked)
-			end
-
+      if(!tabbed || tabs_hash[control] == tabs.currentIndex)
+        case control.class.name
+        when /TextEdit/
+          push_value = (control.plainText)
+          push_value.force_encoding("UTF-8")
+          res.push(push_value)
+        when /LineEdit/
+          push_value = (control.text)
+          push_value.force_encoding("UTF-8")
+          res.push(push_value)
+        when /SpinBox/
+          res.push(control.value)
+        when /PushButton/
+          text = @controls_hash[control].text
+          text.force_encoding("UTF-8")
+          res.push(text.split("|"))
+        when /ComboBox/
+          text = control.currentText
+          text.force_encoding("UTF-8")
+          res.push(text)
+        when /CheckBox/
+          res.push(control.checked)
+        when /UserTable/
+          res.push(control.res)
+          control.save_task_id
+        end
+      end
 			string_label = label_hash[control]
 			@memory_input[string_label] = res.last if(string_label)
 
 		end
-		
+		res.push(tabs.currentIndex) if(tabbed)
 		res
 	end
 	
@@ -995,11 +1052,11 @@ end
 
 
 new_version = nil
-begin
-	new_version = Updater.new.update
-rescue
+#begin
+	#new_version = Updater.new.update
+#rescue
 		
-end
+#end
 
 unless(new_version)
 

@@ -1,0 +1,1 @@
+"Найдено #{ask_peoples.length} людей".print

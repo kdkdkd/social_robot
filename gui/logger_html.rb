@@ -34,7 +34,7 @@
 	 when :image_unlike then res = "Убран лайк к #{args[1].pretty_string}"
 	 
 	 
-	 when :exception_antigate then res = "Ошибка с сервисом antigat.com: #{args[1].message}"
+	 when :exception_antigate then res = "Ошибка с сервисом antigate.com: #{args[1].message}"
 	 when :exception then res = "Error : <font color='red' size='3'>#{args[1].message}</font><br/>#{args[1].backtrace.map{|x| "<font color='grey' size='2'>" + x + "</font>"}.join("<br/>")}"
 	 when :warning_invite then res = "Предупреждение : количество на сегодня приглашений исчерпано"
    when :search_users then res = "Запущен поиск по группе #{args[1].pretty_string}, это может занять довольно долгое время..."

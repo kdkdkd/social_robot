@@ -82,7 +82,7 @@ ask_captcha	do |pict|
 					when "ERROR_NO_SLOT_AVAILABLE" then res = nil; sleep 5
 					when "ERROR_CAPTCHA_UNSOLVABLE" then res = "asdas"
 					when "ERROR_BAD_DUPLICATES" then res = "asdas"
-					else progress(:exception_antigate,e); res = "asdas"; sleep 30;
+					else progress(:exception_antigate,e); res = "asdas"; sleep 30
 				end
 			end
 		end
@@ -100,8 +100,8 @@ def ask(params = {})
 	$mutex.synchronize{
 			$res<<{:hash=>params, :type=>:ask, :id => Thread.current[:id]}
 		}
-        
-	
+
+
 	while(true) do
 		res = Thread.current["result_ask"]
 		if res
@@ -110,7 +110,7 @@ def ask(params = {})
 			end
 			return res
 		end
-  		sleep 0.1
+			sleep 0.1
 	end
 end
 
@@ -125,35 +125,60 @@ def ask_text(str = "Введите текст")
 end
 
 def ask_peoples
-	r = ask(
-	 "Критерий(Имя или интерес)" => "string" ,
+  months = ["Не важно", "Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"]
+  r = ask(
+	 {"tab" => {"data"=>{"Критерий(Имя или интерес)" => "string" ,
 	 "Искать по.." => {"Type" => "combo","Values" => ["По интересам","По имени"] },
 	 "Сортировать по.." => {"Type" => "combo","Values" => ["По рейтингу","По дате регистрации"] },
 	 "Страна" => {"Type" => "combo","Values" => ["Не важно"] + Vkontakte.countries.keys },
 	 "Город" => "string" ,
-	 "Количество результатов" => {"Type" => "int","Default" => 100, "Minimum" => 1 },
-	 "Начиная с..." => {"Type" => "int","Default" => 0, "Minimum" => 0, "Maximum" => 999 },
+	 "Количество результатов" => {"Type" => "int","Default" => 5000, "Minimum" => 1, "Maximum" => 10000000 },
+	 "Начиная с..." => {"Type" => "int","Default" => 0, "Minimum" => 0, "Maximum" => 10000000 },
 	 "Пол"=>{"Type" => "combo","Values" => ["Не важно","Мужской","Женский"] },
 	 "Онлайн"=>{"Type" => "combo","Values" => ["Не важно","Только онлайн"] },
-	 "От"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a },
-	 "До"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a }
+	 "Возраст От"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a },
+	 "Возраст До"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a },
+   "Месяц рождения"=>{"Type" => "combo","Values" => months },
+   "День рождения"=>{"Type" => "combo","Values" => ["Не важно"] + (1..31).to_a },
+   "Страница группы.\nНапример, так http://vk.com/evil_incorparate"=>"string"
+	 }, "name" => "Поиск"},
+	 "tab1" => {"data" => "USERLIST", "name" => "Прошлые поиски"},
+	 "tab2" => {"data" => {"Список людей\nВведите id людей по одному в каждой строке" => "text"}, "name" => "Список"}}
 	)
 
-	q = { }
+	case(r.last)
+		when 0 then
+
+		q = { }
 
 
-	q["Страна"] = r[3] if r[3] != "Не важно"
-	q["Город"] = r[4] if r[4].length>0
+		q["Страна"] = r[3] if r[3] != "Не важно"
+		q["Город"] = r[4] if r[4].length>0
 
-	q["Пол"] = r[7] if r[7] != "Не важно"
-	q["Онлайн"] = "Да" if r[8] != "Не важно"
-	q["От"] =  r[9] if r[9] != "Не важно"
-	q["До"] =  r[10] if r[10] != "Не важно"
-	q["По имени"] =  (r[1] == "По имени")? "Да" : "Нет"
-	q["По дате"] =  (r[2] == "По дате регистрации")? "Да" : "Нет"
+		q["Пол"] = r[7] if r[7] != "Не важно"
+		q["Онлайн"] = "Да" if r[8] != "Не важно"
+		q["От"] =  r[9] if r[9] != "Не важно"
+		q["До"] =  r[10] if r[10] != "Не важно"
+
+    q["Месяц рождения"] =  months.index(r[11]) if r[11] != "Не важно"
+    q["День рождения"] =  r[12] if r[12] != "Не важно"
+    if r[13].length>0
+      g = Group.parse(r[13])
+      q["Группа"] = g.id if g
+    end
+		q["По имени"] =  (r[1] == "По имени")? "Да" : "Нет"
+		q["По дате"] =  (r[2] == "По дате регистрации")? "Да" : "Нет"
 
 
-	res = User.all(r[0],r[5],r[6],q)
+		res = User.force_all(r[0],r[5],r[6],q)
+		when 1 then
+
+		res = r[0].map{|line| split = line.split(":"); User.new.set(split[0],split[1],me.connect)}
+		when 2 then
+
+		res = r[0].split("\n").map{|x| split = split(":"); User.new.set(split[0],split[1],me.connect)}
+
+	end
 	res
 end
 
@@ -172,54 +197,54 @@ def ask_files(str = "Выберите файлы")
 	ask(str => "files")[0]
 end
 
-  def ask_media(params={})
-    params_message = {"Адрес видео\nvk.com/video9490653_160343384" => "string","ИЛИ код видео на youtube\n например если видео http://www.youtube.com/watch?v=6xDAxQ9GpXM , то код - 6xDAxQ9GpXM" => "string", "Название музыки в вашем списке(можно пустое)" => "string","Адрес фотографии\n например vk.com/photo9490653_247429819\nможно пустое" => "string","ИЛИ укажите место на вашем ПК" => "file"}
-    params_all = {}
-    params.each{|k,v| params_all[k] = v}
-    params_message.each{|k,v| params_all[k] = v}
-    res = ask(params_all)
-    [res[0..params.length-1],res[params.length..params_all.length-1]]
+	def ask_media(params={})
+		params_message = {"Адрес видео\nvk.com/video9490653_160343384" => "string","ИЛИ код видео на youtube\n например если видео http://www.youtube.com/watch?v=6xDAxQ9GpXM , то код - 6xDAxQ9GpXM" => "string", "Название музыки в вашем списке(можно пустое)" => "string","Адрес фотографии\n например vk.com/photo9490653_247429819\nможно пустое" => "string","ИЛИ укажите место на вашем ПК" => "file"}
+		params_all = {}
+		params.each{|k,v| params_all[k] = v}
+		params_message.each{|k,v| params_all[k] = v}
+		res = ask(params_all)
+		[res[0..params.length-1],res[params.length..params_all.length-1]]
 
-  end
+	end
 
-  def parse_media(result_ask,user)
+	def parse_media(result_ask,user)
 
-    video =  result_ask[0]
-    video_you =  result_ask[1]
-    video_code = nil
-    if(video.length>0)
-      video_code = Video.parse(video).attach_code
-    elsif(video_you.length>0)
-      video_code = safe{Video.upload_youtube(video_you,"",user).attach_code}
-    else
-      video_code = nil
-    end
-
-
-	  #Найти музыку
-	  music =  result_ask[2]
-    music_code = nil
-	  if(music.length>0)
-      music_code = user.music.one(music).attach_code
-    else
-      music_code = nil
-    end
+		video =  result_ask[0]
+		video_you =  result_ask[1]
+		video_code = nil
+		if(video.length>0)
+			video_code = Video.parse(video).attach_code
+		elsif(video_you.length>0)
+			video_code = safe{Video.upload_youtube(video_you,"",user).attach_code}
+		else
+			video_code = nil
+		end
 
 
-                #Найти фото
-                photo =  result_ask[3]
-                photo_local =  result_ask[4]
-                photo_code = nil
-                if(photo.length>0)
-                      photo_code = Image.parse(photo).attach_code
-                elsif(photo_local.length>0)
-                      photo_code = Album.create("Новый","альбом",user).upload(photo_local,"").attach_code
-                end
-    [photo_code,video_code,music_code]
+		#Найти музыку
+		music =  result_ask[2]
+		music_code = nil
+		if(music.length>0)
+			music_code = user.music.one(music).attach_code
+		else
+			music_code = nil
+		end
 
-  end
 
-	
+								#Найти фото
+								photo =  result_ask[3]
+								photo_local =  result_ask[4]
+								photo_code = nil
+								if(photo.length>0)
+											photo_code = Image.parse(photo).attach_code
+								elsif(photo_local.length>0)
+											photo_code = Album.create("Новый","альбом",user).upload(photo_local,"").attach_code
+								end
+		[photo_code,video_code,music_code]
+
+	end
+
+
 #Access to User self object
 def me
 	thread_user = Thread.current["user"]
@@ -231,7 +256,7 @@ def me
 		res = ask("Логин"=>"string","Пароль"=>"pass")
 		u = User.login(res[0],res[1])
 		raise "Не правильный логин/пароль" unless u
-		
+
 		$db[:account].insert(:email => res[0], :password => res[1])
 		Users.add_user(u)
 		$mutex.synchronize{
@@ -239,6 +264,65 @@ def me
 		}
 	end
 	u
+end
+
+class User
+  def User.force_all(query = '', size = 50, offset = 0, hash_qparams = {}, connector=nil)
+    mutex_all = Mutex.new
+    mutex_res = Mutex.new
+    name = "Поиск от #{Time.now.strftime("%Y-%m-%d %H:%M")}\n" + hash_qparams.map{|x,y|"#{x} - #{y}"}.join("\n")
+
+    list_id = $db[:list].insert(:name=>name)
+
+    res = []
+    all_no_offset = User.force_all_searches(query,size + offset,hash_qparams,connector)
+    all_no_offset.reverse!
+    all = []
+    offset_achieved = 0
+    all_no_offset.each do |h|
+
+      if offset_achieved <  offset
+        if(offset - offset_achieved >= h["size"])
+          offset_achieved += h["size"]
+        else
+          h_new = h.clone
+          h_new["offset"] = offset - offset_achieved
+          h_new["size"] = h["size"] - (offset - offset_achieved)
+          offset_achieved = offset
+          all << h_new
+        end
+      else
+        h_new = h.clone
+
+        h_new["offset"] = 0
+        
+        all << h_new
+      end
+    end
+
+    threads_search = []
+    Users.users do |u|
+      threads_search<<thread do
+        while true
+          current = nil
+          mutex_all.synchronize{
+            current = all.pop
+            current = current.clone if current
+          }
+
+          break unless current
+          add_res = User.all(query, current["size"], current["offset"], current["params"],u)
+          $db[:user].import([:id,:name, :list_id], add_res.map{|x|[x.id_raw,x.name,list_id]})
+          mutex_res.synchronize{
+            res += add_res
+          }
+        end
+      end
+    end
+
+    threads_search.each{|t|t.join}
+    return res
+  end
 end
 
 def use_anonymizer
@@ -258,40 +342,40 @@ end
 
 def update_options
 	Settings.reload
-          if(Settings["use_proxy"] == "true")
-            Vkontakte::use_proxy = true
-            proxy_list = []
+					if(Settings["use_proxy"] == "true")
+						Vkontakte::use_proxy = true
+						proxy_list = []
 
-            $db[:proxy].each do |p|
-              login = p[:login]
-              login = nil if(login && login.length == 0)
-              pass = p[:password]
-              pass = nil if(pass && pass.length == 0)
-              proxy_list.push([p[:server],p[:port],login,pass])
+						$db[:proxy].each do |p|
+							login = p[:login]
+							login = nil if(login && login.length == 0)
+							pass = p[:password]
+							pass = nil if(pass && pass.length == 0)
+							proxy_list.push([p[:server],p[:port],login,pass])
 
-            end
-            Vkontakte::proxy_list = proxy_list
-          else
-            Vkontakte::use_proxy = false
-          end
+						end
+						Vkontakte::proxy_list = proxy_list
+					else
+						Vkontakte::use_proxy = false
+					end
 
 
-          Vkontakte::user_list = Users.user_list
+					Vkontakte::user_list = Users.user_list
 
-          Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
-          Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
-          Vkontakte.like_interval = Settings["like_interval"].to_f
-          Vkontakte.mail_interval = Settings["mail_interval"].to_f
-          Vkontakte.post_interval = Settings["post_interval"].to_f
-          Vkontakte.invite_interval = Settings["invite_interval"].to_f
-          Vkontakte.transform_captcha = Settings["captcha_solver"] == "0"
-          Vkontakte.user_login_interval = (Settings["login_interval"].nil?)? 4.0:Settings["login_interval"].to_f;
-		  if(Settings["use_anonymizer"] == "true")
+					Vkontakte.user_fetch_interval = Settings["user_fetch_interval"].to_f
+					Vkontakte.photo_mark_interval = Settings["photo_mark_interval"].to_f
+					Vkontakte.like_interval = Settings["like_interval"].to_f
+					Vkontakte.mail_interval = Settings["mail_interval"].to_f
+					Vkontakte.post_interval = Settings["post_interval"].to_f
+					Vkontakte.invite_interval = Settings["invite_interval"].to_f
+					Vkontakte.transform_captcha = Settings["captcha_solver"] == "0"
+					Vkontakte.user_login_interval = (Settings["login_interval"].nil?)? 4.0:Settings["login_interval"].to_f;
+			if(Settings["use_anonymizer"] == "true")
 			use_anonymizer
-		  else
+			else
 			force_location
-		  end
-				
+			end
+
 
 end
 
@@ -323,7 +407,7 @@ end
 def user_list
 	Users.user_list
 end
-	
+
 def total(value,range)
 	$mutex.synchronize{
 		$res<<{:value=>value,:range=>range, :type => :total, :id => Thread.current[:id]}
@@ -331,7 +415,7 @@ def total(value,range)
 end
 
 def thread(*params)
-	
+
 	thread = Thread.new(*params) do |*p|
 		Thread.stop
 		yield(*p)
@@ -340,7 +424,7 @@ def thread(*params)
 	thread["join"] = true
 	sleep 0.1 while thread.status != 'sleep'
 	thread.wakeup
-
+  thread
 end
 
 def join
@@ -349,7 +433,7 @@ def join
 			t.join 
 		end
 	end
-			
+
 end
 
 
@@ -379,25 +463,26 @@ Thread.new do
 	while true
 		$mutex.synchronize{
 			if($res.length>0)
-			
+
 				to_add = $res[0..20]
 				$res = $res[21..$res.length-1]
 				$res = [] unless $res
-				
-     			json = to_add.to_json	
+
+					json = to_add.to_json
 				client.puts "<!!MESSAGE!!>" + json + "<!!MESSAGE!!>"
 				$logger.info "send #{json}"
 			end
-			
-			
+
+
 		}
 		sleep 0.2
 	end
 end
 
+
 #receive commands
 loop do 
-    task_string = client.gets
+		task_string = client.gets
 	$logger.info task_string
 	task_json = JSON.parse(task_string)
 	if task_json["type"] == "eval"
@@ -437,14 +522,10 @@ loop do
 		thread["result_ask"] = task_json["hash"]
 	elsif task_json["type"] == "update_options"
 		update_options()
-		
+
 
 	end
 
 end
 
 
-
-
-
-    
