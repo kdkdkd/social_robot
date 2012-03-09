@@ -176,7 +176,7 @@ def ask_peoples
 		res = r[0].map{|line| split = line.split(":"); User.new.set(split[0],split[1],me.connect)}
 		when 2 then
 
-		res = r[0].split("\n").map{|x| split = line.split(":"); User.new.set(split[0],split[1],me.connect)}
+		res = r[0].split("\n").map{|x| split = x.split(":"); User.new.set(split[0],split[1],me.connect)}
 
 	end
 	res
