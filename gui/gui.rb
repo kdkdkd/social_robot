@@ -332,8 +332,8 @@ class SocialRobot < Qt::MainWindow
 		connect(@database_peoples, SIGNAL('triggered()'), self, SLOT('database_peoples()'))
 
 
-    @database_lists = Qt::Action.new(Qt::Icon.new("images/list.png"),"Списки", self)
-		@database_lists.statusTip = "Редактировать списки"
+    @database_lists = Qt::Action.new(Qt::Icon.new("images/list.png"),"Списки людей", self)
+		@database_lists.statusTip = "Редактировать списки людей"
 		connect(@database_lists, SIGNAL('triggered()'), self, SLOT('database_lists()'))
 		
 		@database_proxy = Qt::Action.new("Прокси", self)

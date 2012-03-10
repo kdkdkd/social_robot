@@ -84,8 +84,8 @@ class Users
 			if u
    			users.push(u)
   			"Зашел #{user[0]}".print
-        yield u
-
+        do_stop = yield(u)
+        break if do_stop == "STOP"
 			else
 				"Не зашел #{user[0]}".print
 			end

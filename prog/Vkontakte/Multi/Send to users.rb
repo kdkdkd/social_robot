@@ -7,8 +7,8 @@ message = result_ask[0][1]
 peoples = ask_peoples
 total_length = peoples.length
 
-"Сообщение будет разослано этим людям :".print
-peoples.print
+"Сообщение будет разослано #{peoples.length} людям.".print
+
 
 #Синхронизируем доступ к людям
 mutex = Mutex.new
@@ -17,7 +17,10 @@ current = 0
 
 check_users do |user_out|
 		
-		mutex.synchronize{raise "Завершено: задание выполнено" if peoples.length == 0}
+		user_continue = true
+      		mutex.synchronize{
+        			user_continue = "STOP" if peoples.length < 2
+     		}
 
 		media_out = [nil,nil,nil]
 		
@@ -46,7 +49,7 @@ check_users do |user_out|
 				break unless user.connect.able_to_send_message
 			end
 		end
-		
+		user_continue
 end
 
 join

@@ -15,12 +15,12 @@ friends = me.friends
 total(62,100)
 
 #Список моих друзей
-"Список моих друзей (#{friends.length}):".print
-friends.print
+"Мои друзья (#{friends.length}):".print
+(friends[0..20] + ((friends.length>20)? ["..."] : [])).print
 
 #Получить группы
 groups = me.groups
 
 #Список моих групп
-"Список моих групп (#{groups.length}):".print
-groups.print
+"Мои группы (#{groups.length}):".print
+(groups[0..20] + ((groups.length>20)? ["..."] : [])).print

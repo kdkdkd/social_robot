@@ -81,7 +81,12 @@ class UserTable < Qt::Widget
        @edit.setStyleSheet("QTextEdit{background-color: #E8E8E8;}")
        @edit.plainText = ""
        @last_selected_changed = false
+       @delete.text = "Удалить все списки людей"
+       @delete_all_lists = true
        return
+    else
+      @delete.text = "Удалить текущий список людей"
+      @delete_all_lists = false
     end
     @edit.setStyleSheet("QTextEdit{background-color: white;}")
     list_id = $db[:list][:name=>@list.currentItem.text][:id]
@@ -99,18 +104,41 @@ class UserTable < Qt::Widget
       all += "#{add_string}\n"
       count += 1
     end
-    @label.text = "#{@list.currentItem.text.force_encoding("UTF-8")}\nКолчество : #{count}"
+    @label.text = "#{@list.currentItem.text.force_encoding("UTF-8")}\nКоличество : #{count}"
 		@edit.plainText = all
      @last_selected_changed = false
   end
 
   def delete_clicked
-     if @list.currentItem.nil?
-       @label.text = "Список не выбран"
+    if @delete_all_lists
+
+      if(@list.count>0)
+
+        msgBox = Qt::MessageBox.new
+        msgBox.setText("Удалить все списки.")
+        msgBox.setInformativeText("Вы действительно хотите удалить все списки?")
+        msgBox.setStandardButtons(Qt::MessageBox::Ok | Qt::MessageBox::Cancel)
+        msgBox.setDefaultButton(Qt::MessageBox::Cancel)
+        msgBox.setWindowIcon(Qt::Icon.new("images/logo.png"))
+        res = msgBox.exec() == Qt::MessageBox::Ok
+        if(res)
+          $db[:list].delete
+          $db[:user].delete
+          @list.clear()
+        end
+      end
+
+    else
+      if @list.currentItem.nil?
+        @label.text = "Список не выбран"
+        @delete.text = "Удалить все списки людей"
+        @delete_all_lists = true
        return
      end
       $db[:list].filter(:name=>@list.currentItem.text).delete
      @list.takeItem(@list.currentRow)
+  end
+
   end
 
   def add_clicked
@@ -152,17 +180,19 @@ class UserTable < Qt::Widget
     add.text = "Добавить список людей"
     add.setIcon(Qt::Icon.new("images/add.png"))
     connect(add,SIGNAL('clicked()'),self,SLOT('add_clicked ()'))
-    delete = Qt::PushButton.new
-    delete.text = "Удалить список людей"
-    delete.setIcon(Qt::Icon.new("images/delete.png"))
-    connect(delete,SIGNAL('clicked()'),self,SLOT('delete_clicked ()'))
-    delete.iconSize =  Qt::Size.new(16,16)
+    @delete = Qt::PushButton.new
+    @delete.text = "Удалить все списки людей"
+    @delete_all_lists = true
+
+    @delete.setIcon(Qt::Icon.new("images/delete.png"))
+    connect(@delete,SIGNAL('clicked()'),self,SLOT('delete_clicked ()'))
+    @delete.iconSize =  Qt::Size.new(16,16)
     @list = Qt::ListWidget.new
     connect(@list,SIGNAL('itemSelectionChanged  ()'),self,SLOT('list_selected ()'))
 
     list_and_commands_layout.addWidget(@list)
     list_and_commands_layout.addWidget(add)
-    list_and_commands_layout.addWidget(delete)
+    list_and_commands_layout.addWidget(@delete)
     layout.addWidget(list_and_commands)
     layout.addWidget(right_widget)
     $db[:list].each do |list|

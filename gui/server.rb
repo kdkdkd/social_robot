@@ -173,10 +173,10 @@ def ask_peoples
 		res = User.force_all(r[0],r[5],r[6],q)
 		when 1 then
 
-		res = r[0].map{|line| split = line.split(":"); User.new.set(split[0],split[1],me.connect)}
+		res = r[0].map{|line| split = line.split(":"); User.new.set(split[0].gsub(/\s/,""),split[1],me.connect)}
 		when 2 then
 
-		res = r[0].split("\n").map{|x| split = x.split(":"); User.new.set(split[0],split[1],me.connect)}
+		res = r[0].split("\n").map{|x| split = x.split(":"); User.new.set(split[0].gsub(/\s/,""),split[1],me.connect)}
 
 	end
 	res
@@ -262,6 +262,7 @@ def me
 		$mutex.synchronize{
 			$res<<{:type=>:update_name_choose_login}
 		}
+    Thread.current["user"] = res[0]
 	end
 	u
 end
@@ -295,13 +296,17 @@ class User
         h_new = h.clone
 
         h_new["offset"] = 0
-        log h_new
+        #log h_new
         all << h_new
       end
     end
 
     threads_search = []
     Users.users do |u|
+      user_continue = true
+      mutex_all.synchronize{
+        user_continue = "STOP" if all.length < 2
+      }
       threads_search<<thread do
         while true
           current = nil
@@ -312,12 +317,16 @@ class User
 
           break unless current
           add_res = User.all(query, current["size"], current["offset"], current["params"],u)
+          #log current["params"]
           $db[:user].import([:id,:name, :list_id], add_res.map{|x|[x.id_raw,x.name,list_id]})
           mutex_res.synchronize{
             res += add_res
           }
         end
+
       end
+
+      user_continue
     end
 
     threads_search.each{|t|t.join}

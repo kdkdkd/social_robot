@@ -1483,7 +1483,8 @@ module Vkontakte
 			res_total = []
 
       User.divide_hash(hash_qparams).each do |hash_divided|
-        res_total +=(User.force_all_searches(query,size - res_total.length,hash_divided,connector))
+        all_length = res_total.inject(0){|sum,h|sum += h["size"];sum}
+        res_total +=(User.force_all_searches(query,size - all_length,hash_divided,connector))
       end
       res_total
 		end
@@ -1553,8 +1554,8 @@ module Vkontakte
 			qhash["c[name]"] = (hash_qparams["По имени"] == "Да")? "1":"0"
 			qhash["c[sort]"] = "1" if (hash_qparams["По дате"] == "Да")
 			qhash["c[group]"] = (hash_qparams["Группа"]) if (hash_qparams["Группа"])
-      qhash["c[month]"] = hash_qparams["Месяц рождения"] if hash_qparams["Месяц рождения"]
-      qhash["c[day]"] = hash_qparams["День рождения"] if hash_qparams["День рождения"]
+      qhash["c[bmonth]"] = hash_qparams["Месяц рождения"] if hash_qparams["Месяц рождения"]
+      qhash["c[bday]"] = hash_qparams["День рождения"] if hash_qparams["День рождения"]
 
 			
 			res = nil
@@ -1594,7 +1595,7 @@ module Vkontakte
 				if(res_array.length > 0)
 					return [res_array,json_has_more,json_offset,json_length]
 				end
-				return  [[],false,0,nil] if(seconds_sleep>1000)
+				return  [[],false,0,nil] if(seconds_sleep>50)
 				progress "sleep #{seconds_sleep}"
         sleep seconds_sleep
 				seconds_sleep *= 4
