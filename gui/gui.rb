@@ -26,102 +26,97 @@ $app = Qt::Application.new(ARGV)
 
 $client = nil
 
+$shared = File.expand_path("../../shared")
+
 
 class SocialRobot < Qt::MainWindow
-	slots   'database_lists()', 'read()','connected()','delete_button_click()','stop_button_click()', 'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
+	slots   'database_lists()', 'read()','delete_button_click()','stop_button_click()', 'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
 
-	def connected
-		
-	end
-	
+
 	def read
-		res = sender.readAll.to_s
-	
-		
-		@buffer += res
-		
-		split = @buffer.split("<!!MESSAGE!!>")
-        
-		if @buffer =~ /\<\!\!MESSAGE\!\!\>$/ 
-			@buffer = ""
-		else
-			@buffer = split.pop 
+    Dir[File.join($shared,"*.in")].each do|file|
+
+      read_failed = true
+      while read_failed
+        begin
+          content = IO.read(file).force_encoding("UTF-8")
+          read_failed = false
+        rescue
+
+        end
+      end
+
+      split = content.split("<!!MESSAGE!!>")
+
+      split.each do |j|
+
+        next if j =~ /^\s*$/
+        j.force_encoding("UTF-8")
+        json = []
+        begin
+          json = JSON.parse(j)
+
+        rescue
+          puts "ERROR"
+        end
+        json.each do |r|
+          if(r["type"] == "update_name_choose_login")
+            update_name_login_choose
+            next
+          end
+          t = Task.find_id(r["id"])
+          if(t)
+
+            if r["type"] == "log"
+              t.tab.append("<font color='black' size='3'>#{(r["text"]).to_s.force_encoding("UTF-8")}</font><br/>")
+            elsif r["type"] == "progress"
+              t.progress_text = r["text"]
+            elsif r["type"] == "state"
+              t.state = r["text"]
+            elsif r["type"] == "total"
+              t.progress_current = r["value"]
+              t.progress_total = r["range"]
+            elsif r["type"] == "ask"
+              ask_res = ask(r["hash"])
+              send_data({:hash => ask_res,:id => r["id"], :type=> :ask})
+            end
+          end
+        end
+      end
+
+      begin
+        FileUtils.rm_rf(file)
+      rescue
+      end
 		end
-		
-		split.each do |j|
-		  
-			next if j =~ /^\s*$/
-			j.force_encoding("UTF-8")
-			json = []
-			begin
-				json = JSON.parse(j)
-				
-			rescue
-				puts "ERROR"
-			end
-			json.each do |r|
-				if(r["type"] == "update_name_choose_login")
-					update_name_login_choose
-					next
-				end
-				t = Task.find_id(r["id"])
-				if(t)
-				
-					if r["type"] == "log"
-						t.tab.append("<font color='black' size='3'>#{(r["text"]).to_s.force_encoding("UTF-8")}</font><br/>")
-					elsif r["type"] == "progress"
-						t.progress_text = r["text"]
-					elsif r["type"] == "state"
-						t.state = r["text"]
-					elsif r["type"] == "total"
-						t.progress_current = r["value"]
-						t.progress_total = r["range"]
-          elsif r["type"] == "ask"
-            ask_res = ask(r["hash"])
-						send_data({:hash => ask_res,:id => r["id"], :type=> :ask})
-					end
-				end
-			end
-		end
-		
 	end
 	
 	def send_data(data)
-		@socket.write(data.to_json + "\n")
-		@socket.flush()
-		@socket.waitForBytesWritten(10000000)
+    filename = File.join($shared,(0..32).map{(65+rand(25)).chr}.join)
+    temp = "#{filename}.temp"
+    File.open(temp,"w"){|f| f << data.to_json}
+		FileUtils.mv(temp,"#{filename}.out")
 	end
 	
 	#Create gui and set timer
 	def initialize()
 		super
-		
+    Dir::mkdir($shared) unless File.exists?($shared) && File.directory?($shared)
+    FileUtils.rm_rf(Dir[File.join($shared,"*.*")])
+    send_data({:type=> :exit})
+    sleep 1
+    FileUtils.rm_rf(Dir[File.join($shared,"*.*")])
+
 		#start server
-		@buffer = ""
 		server_script = File.expand_path("./server.rb")
 		ruby = File.expand_path("../../ruby/bin/rubyw.exe")
-		arguments = []
-		arguments << server_script
+  	server_process = Qt::Process.new
+		server_process.start(ruby, [server_script])
 
-		server_process = Qt::Process.new
+		@watcher = Qt::FileSystemWatcher.new
+    @watcher.addPath($shared)
+    connect(@watcher,SIGNAL("directoryChanged ( const QString & )"),self,SLOT("read()"))
 
-		Settings["port"] = nil
-		Settings.save
-		server_process.start(ruby, arguments)
-
-		while true
-			Settings.reload
-			port = Settings["port"]
-			break if port
-			sleep 0.1
-		end
-		
-		@socket = Qt::TcpSocket.new
-		@socket.connectToHost('localhost',port.to_i)
-		connect(@socket,SIGNAL("connected()"),self,SLOT("connected()"))
-		connect(@socket,SIGNAL("readyRead()"),self,SLOT("read()"))
-		
-		
 		setWindowTitle("Социальный робот. " + IO.read("../version.txt"))
 		setWindowIcon(Qt::Icon.new("images/logo.png"))
 		#Create main widgets and dock interface 
@@ -706,6 +701,7 @@ class SocialRobot < Qt::MainWindow
 		check = check_changes
 		if check
 			event.accept()
+      send_data({:type=> :exit})
 		else
 			event.ignore()
 		end

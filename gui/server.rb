@@ -15,6 +15,7 @@ require './users.rb'
 data = RobotDatabase.new(File.join(File.expand_path("../.."),"data/data.db"))
 $db = data.db
 $mutex = Mutex.new
+$shared = File.expand_path("../../shared")
 
 #vkontakte initialization
 
@@ -453,12 +454,7 @@ Dir.mkdir(log_dir) unless Dir.exist?(log_dir)
 
 $logger = Logger.new(File.join(log_dir,'server_log.txt'), 10, 1024000)
 $logger.level = Logger::DEBUG
-server = TCPServer.open(0)
 
-$logger.info "listening #{server.addr[1]}"
-Settings["port"] = server.addr[1]
-Settings.save
-client = server.accept
 
 $logger.info "CONNECTED"
 
@@ -472,14 +468,18 @@ Thread.new do
 	while true
 		$mutex.synchronize{
 			if($res.length>0)
+        filename = File.join($shared,(0...32).map{(65+rand(25)).chr}.join)
+        temp = "#{filename}.temp"
+        File.open(temp,"w") do |f|
+          to_add = $res[0..20]
+          $res = $res[21..$res.length-1]
+          $res = [] unless $res
 
-				to_add = $res[0..20]
-				$res = $res[21..$res.length-1]
-				$res = [] unless $res
-
-					json = to_add.to_json
-				client.puts "<!!MESSAGE!!>" + json + "<!!MESSAGE!!>"
-				$logger.info "send #{json}"
+            json = to_add.to_json
+          f.puts "<!!MESSAGE!!>" + json + "<!!MESSAGE!!>"
+          $logger.info "send #{json}"
+        end
+        FileUtils.mv(temp,"#{filename}.in")
 			end
 
 
@@ -489,52 +489,75 @@ Thread.new do
 end
 
 
+
+
+
+
 #receive commands
-loop do 
-		task_string = client.gets
-	$logger.info task_string
-	task_json = JSON.parse(task_string)
-	if task_json["type"] == "eval"
-		thread = Thread.new(task_json["id"],task_json["eval"]) do |id,e|
-			Thread.stop
-			res = ""
-			ex = nil
-			begin
-				res = eval(e)
-			rescue Exception => exeption
-				ex = exeption
-			end
-			if(ex)
-				ex.message.print
-				ex.backtrace.each{|l| l.print}
-				progress "Ошибка"
-				$mutex.synchronize{
-					$res<<{:text=>"failed",:type=>:state, :id => Thread.current[:id]}
-				}
-			else
-				"Выполнен".print
-				progress "Выполнен"
-				$mutex.synchronize{
-					$res<<{:text=>"done",:type=>:state, :id => Thread.current[:id]}
-				}
-			end
-		end
-		thread["id"] = task_json["id"]
-		thread["user"] = task_json["user"]
-		thread["name"] = task_json["name"]
-		sleep 0.1 while thread.status != 'sleep'
-		thread.wakeup
-	elsif task_json["type"] == "stop"
-		Thread.list.each{|t| t.kill if t["id"].to_s == task_json["id"].to_s}
-	elsif task_json["type"] == "ask"
-		thread = Thread.list.find{|t| t["id"].to_s == task_json["id"].to_s}
-		thread["result_ask"] = task_json["hash"]
-	elsif task_json["type"] == "update_options"
-		update_options()
+loop do
 
 
-	end
 
+  Dir[File.join($shared,"*.out")].each do|file|
+    task_string = ""
+    begin
+      task_string = IO.read(file).force_encoding("UTF-8")
+    rescue
+      next
+    end
+
+    begin
+      FileUtils.rm_rf(file)
+    rescue
+    end
+
+    $logger.info task_string
+    task_json = JSON.parse(task_string)
+
+    if task_json["type"] == "eval"
+      thread = Thread.new(task_json["id"],task_json["eval"]) do |id,e|
+        Thread.stop
+        res = ""
+        ex = nil
+        begin
+          res = eval(e)
+        rescue Exception => exeption
+          ex = exeption
+        end
+        if(ex)
+          ex.message.print
+          ex.backtrace.each{|l| l.print}
+          progress "Ошибка"
+          $mutex.synchronize{
+            $res<<{:text=>"failed",:type=>:state, :id => Thread.current[:id]}
+          }
+        else
+          "Выполнен".print
+          progress "Выполнен"
+          $mutex.synchronize{
+            $res<<{:text=>"done",:type=>:state, :id => Thread.current[:id]}
+          }
+        end
+      end
+      thread["id"] = task_json["id"]
+      thread["user"] = task_json["user"]
+      thread["name"] = task_json["name"]
+      sleep 0.1 while thread.status != 'sleep'
+      thread.wakeup
+    elsif task_json["type"] == "stop"
+      Thread.list.each{|t| t.kill if t["id"].to_s == task_json["id"].to_s}
+    elsif task_json["type"] == "ask"
+      thread = Thread.list.find{|t| t["id"].to_s == task_json["id"].to_s}
+      thread["result_ask"] = task_json["hash"]
+    elsif task_json["type"] == "update_options"
+      update_options()
+    elsif task_type["type"] == "exit"
+      exit
+
+    end
+
+  end
+  sleep 0.1
 end
 
 
