@@ -452,7 +452,7 @@ module Vkontakte
 				addr_of_user = (id =~ /^\d+$/)? ("/id" + id):("/" + id)
 				res = get(addr_of_user)
 				return nil if res.nil?
-				if(res.index('"post_hash"') || res.index('"profile_deleted_text"'))
+				if(res.index('"post_hash"') || res.index('"profile_deleted_text"') || res.index('"profile_blocked"'))
 					not_ok = false
 				else
 					sleep sleep_time
@@ -460,7 +460,12 @@ module Vkontakte
 				end
 			end
 			@last_user_fetch_date = Time.new
-			res
+			if(res && res.index('"post_hash"'))
+        res
+      else
+        nil
+      end
+
 		end
 
 		#Fetch group page
@@ -1371,7 +1376,11 @@ module Vkontakte
 			progress "Inviting #{@id}..."
 
 			fh = friend_hash
-			
+			unless fh
+        @connect.last_user_invite = Time.new
+        @connect = connect_old
+        return
+      end
 			captcha_sid = nil
 			captcha_key = nil
 			while true
