@@ -1278,13 +1278,14 @@ module Vkontakte
 			while true
 				hash = {"act" => "a_send","al" => "1", "chas" => hash_get, "extra_chas" => extra_hash_get, "from" => "write", "message" => message, "title" => title, "to_ids" => id }
 				was_attach = false
+        hash["media"] = ""
 				if(attach_photo)
-					hash["media"] = "photo:#{attach_photo}"
+					hash["media"] = "photo#{attach_photo}"
 					was_attach = true
 				end
 				if(attach_video)
 					hash["media"] += "," if was_attach
-					hash["media"] += "video:#{attach_video}"
+					hash["media"] += "video#{attach_video}"
 					was_attach = true
 				end
 				if(attach_music)
@@ -1306,14 +1307,15 @@ module Vkontakte
 					if captcha_sid.to_i == 8
 						connect.able_to_send_message = false
 						progress :able_to_send_message,connect
-						return
+						return nil
 					end
 					captcha_key = connect.ask_captcha_internal(captcha_sid)
 				end
 			end
 			progress :user_mail,self,message
 			connect.last_user_mail = Time.new
-			return
+      res_mail = Mail.new.set(self,res.scan(/r\=(\d+)/)[0][0],message,title,nil,"outbox",connect)
+			return res_mail
 		end
 		
 		
@@ -1640,7 +1642,42 @@ module Vkontakte
     end
 
 		
-	end
+  end
+
+  class Mail
+    attr_accessor :id, :user, :text, :title, :delete_hash, :type, :connect
+    def set(user,id,text,title,delete_hash,type,connect)
+      @id = id
+      @text = text
+      @title = title
+      @connect = connect
+      @user = user
+      @type = type
+      @delete_hash = delete_hash
+      self
+    end
+
+    def remove
+      return false unless connect.login
+      progress "Delete mail #{id} ..."
+      delete_hash = (connect.get("/mail?act=show&id=#{id}")).scan(/\'?\"?mark_hash\'?\"?\s*\:\s*\'?\"?([^\"\'\,]*)/)[0][0]
+      connect.post("/al_mail.php",{"act" => "a_delete", "al" => "1", "from"=>type,"hash"=>delete_hash,"id" => id})
+      progress :mail_remove,self
+    end
+
+
+    def uniq_id
+      self.id + "_" + self.user.id
+    end
+
+    def ==(other_user)
+      self.uniq_id == other_user.uniq_id
+    end
+
+    def hash
+      self.id.hash
+    end
+  end
 
 	class Post
 		attr_accessor :id, :user, :text, :delete_hash, :like_hash, :connect
@@ -1710,7 +1747,7 @@ module Vkontakte
 			return false unless delete_hash
 			progress "Delete post #{id} ..."
 			res_post = @connect.post("/al_wall.php",{"act" => "delete", "al" => "1","from"=>"wall","hash"=>delete_hash,"post"=>"#{user.id}_#{id}","root"=>"0"})
-			progress :post_delete,self
+			progress :post_remove,self
 		end
 
 		def to_s
@@ -1894,7 +1931,19 @@ module Vkontakte
       "#{album.user.id}_#{id}"
     end
 		
-		
+		def Image.get_attach_code(href)
+      href.gsub!("%2F","/")
+      res = href.scan(/(photo\-?\d+\_\d+(\/wall\-?\d+\_\d+)?)/)[0]
+      if(res)
+        res = res[0]
+        res.gsub!("photo","")
+        if(!res.start_with?("-"))
+          res = ":" + res
+        end
+      end
+      res
+    end
+
 		def Image.parse(href)
 			id_complex = href.scan(/photo\d+\_\d+/)[0]
 			id_complex = id_complex.gsub("photo","")
@@ -2086,7 +2135,7 @@ module Vkontakte
 
 	class Video
 		attr_accessor :id, :user
-		def Video.parse(code)
+		def Video.parse(href)
 			id_complex = href.scan(/video\d+\_\d+/)[0]
 			id_complex = id_complex.gsub("video","")
 			id_complex_split = id_complex.split("_")
@@ -2098,6 +2147,19 @@ module Vkontakte
     end
     def attach_code
       "#{user.id}_#{id}"
+    end
+
+    def Video.get_attach_code(href)
+      href.gsub!("%2F","/")
+      res = href.scan(/(video\-?\d+\_\d+\/?)/)[0]
+      if(res)
+        res = res[0]
+        res.gsub!("video","")
+        if(!res.start_with?("-"))
+          res = ":" + res
+        end
+      end
+      res
     end
 		
 		def Video.upload_youtube(code,title,connector = nil)

@@ -19,7 +19,9 @@
 	 
 	 when :post_like then res = "Поставлен лайк к #{args[1].pretty_string}"
 	 when :post_unlike then res = "Убран лайк к #{args[1].pretty_string}"
-	 when :post_remove then res = "#{args[1].pretty_string} - Удалено"
+   when :post_remove then res = "#{args[1].pretty_string} - Удалено"
+
+   when :mail_remove then res = "#{args[1].pretty_string} - Удалено"
 	 
 	 when :album_created then res = "Альбом #{args[1].pretty_string} создан"
 	 when :photo_uploaded then res = "Фотография #{args[1].pretty_string} загружена"

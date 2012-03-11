@@ -336,15 +336,27 @@ module Vkontakte
 	
 	
 	class Post
-		def pretty_string
-			text_output = (text.length>90) ? text[0..87] + "..." : text
-			text_output.gsub!(/\s+/," ")
+    def pretty_string
+      text_output = (text.length>90) ? text[0..87] + "..." : text
+      text_output.gsub!(/\s+/," ")
 
-			res = "<img src = 'images/post.png'/> #{text_output}"
-			res.print_indentation = print_indentation
-			res.pretty_string
-	    end
-	end
+      res = "<img src = 'images/post.png'/> #{text_output}"
+      res.print_indentation = print_indentation
+      res.pretty_string
+    end
+  end
+
+
+  class Mail
+    def pretty_string
+      text_output = (text.length>90) ? text[0..87] + "..." : text
+      text_output.gsub!(/\s+/," ")
+
+      res = "<img src = 'images/mail.png'/> #{text_output}"
+      res.print_indentation = print_indentation
+      res.pretty_string
+    end
+  end
 	
 	class Video
 		def pretty_string

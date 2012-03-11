@@ -1,7 +1,8 @@
 #Спросить, какое сообщение отправлять
-result_ask = ask_media("Тема" => "string" , "Сообщение.\n\n#{aviable_text_features}" => "text")
+result_ask = ask_media("Тема" => "string" , "Сообщение.\n\n#{aviable_text_features}" => "text", "Сделать невидимым для отправителя" => "check")
 title = result_ask[0][0]
 message = result_ask[0][1]
+invisible = result_ask[0][2]
 
 #Поиск людей
 peoples = ask_peoples
@@ -40,8 +41,15 @@ check_users do |user_out|
 				title_actual = sub(title,target)
 	   
 				#Шлем сообщение
-				safe{target.mail(message_actual,false,media[0],media[1],media[2],title_actual,user)}
-				
+				mail = safe{target.mail(message_actual,false,media[0],media[1],media[2],title_actual,user)}
+			
+				#Удаляем сообщение
+				safe do
+					if mail && invisible
+						sleep 0.5 
+						mail.remove
+					end
+				end
 				current += 1
 
 				total(current,total_length)

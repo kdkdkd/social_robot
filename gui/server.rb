@@ -214,7 +214,7 @@ end
 		video_you =  result_ask[1]
 		video_code = nil
 		if(video.length>0)
-			video_code = Video.parse(video).attach_code
+			video_code = Video.get_attach_code(video)
 		elsif(video_you.length>0)
 			video_code = safe{Video.upload_youtube(video_you,"",user).attach_code}
 		else
@@ -237,7 +237,7 @@ end
 								photo_local =  result_ask[4]
 								photo_code = nil
 								if(photo.length>0)
-											photo_code = Image.parse(photo).attach_code
+											photo_code = Image.get_attach_code(photo)
 								elsif(photo_local.length>0)
 											photo_code = Album.create("Новый","альбом",user).upload(photo_local,"").attach_code
 								end
