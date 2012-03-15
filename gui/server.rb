@@ -270,6 +270,7 @@ end
 
 class User
   def User.force_all(query = '', size = 50, offset = 0, hash_qparams = {}, connector=nil)
+    User.find_city(hash_qparams,forсe_login(connector))
     mutex_all = Mutex.new
     mutex_res = Mutex.new
     name = "Поиск от #{Time.now.strftime("%Y-%m-%d %H:%M")}\n" + hash_qparams.map{|x,y|"#{x} - #{y}"}.join("\n")
@@ -277,7 +278,9 @@ class User
     list_id = $db[:list].insert(:name=>name)
 
     res = []
+    "Предварительный поиск".print
     all_no_offset = User.force_all_searches(query,size + offset,hash_qparams,connector)
+    "Будет найдено приблизительно #{all_no_offset.inject(0){|sum,h|sum += h["size"];sum}} результатов. Начинаю...".print
     all_no_offset.reverse!
     all = []
     offset_achieved = 0
@@ -317,8 +320,10 @@ class User
           }
 
           break unless current
-          add_res = User.all(query, current["size"], current["offset"], current["params"],u)
+          add_res = safe{User.all(query, current["size"], current["offset"], current["params"],u)}
+          next unless add_res
           #log current["params"]
+          progress :search_progress,add_res.length
           $db[:user].import([:id,:name, :list_id], add_res.map{|x|[x.id_raw,x.name,list_id]})
           mutex_res.synchronize{
             res += add_res
@@ -331,6 +336,7 @@ class User
     end
 
     threads_search.each{|t|t.join}
+    progress :search_end_progress,res.length
     return res
   end
 end

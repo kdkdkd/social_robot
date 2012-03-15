@@ -45,7 +45,12 @@
    when :bad_proxy then res = "Прокси не подходит #{args[1]}"
    when :need_phone then res = "Нужен телефон"
    
-   when :able_to_send_message then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит сообщений"
+     when :able_to_send_message then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит сообщений"
+
+     when :search_divide_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов. разбиваю..."
+     when :search_fit_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов."
+     when :search_progress then res = "<img src = 'images/search.png'/>Найдено #{args[1]} людей."
+     when :search_end_progress then res = "<img src = 'images/search.png'/>Поиск окончен, найдено #{args[1]} людей."
    
    end
    res.to_s

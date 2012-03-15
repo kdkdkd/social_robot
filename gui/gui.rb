@@ -30,7 +30,7 @@ $shared = File.expand_path("../../shared")
 
 
 class SocialRobot < Qt::MainWindow
-	slots   'database_lists()', 'read()','delete_button_click()','stop_button_click()', 'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
+	slots   'search_peoples()','database_lists()', 'read()','delete_button_click()','stop_button_click()', 'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
 
 
 	def read
@@ -330,6 +330,11 @@ class SocialRobot < Qt::MainWindow
     @database_lists = Qt::Action.new(Qt::Icon.new("images/list.png"),"Списки людей", self)
 		@database_lists.statusTip = "Редактировать списки людей"
 		connect(@database_lists, SIGNAL('triggered()'), self, SLOT('database_lists()'))
+
+
+    @search_peoples = Qt::Action.new(Qt::Icon.new("images/search.png"),"Поиск людей", self)
+    @search_peoples.statusTip = "Списки людей для последующего использования"
+    connect(@search_peoples, SIGNAL('triggered()'), self, SLOT('search_peoples()'))
 		
 		@database_proxy = Qt::Action.new("Прокси", self)
 		@database_proxy.statusTip = "Редактировать прокси сервера"
@@ -357,6 +362,7 @@ class SocialRobot < Qt::MainWindow
 		@fileMenu.addAction(@database_peoples)
 		@fileMenu.addAction(@database_proxy)
     @fileMenu.addAction(@database_lists)
+    @fileMenu.addAction(@search_peoples)
 		@fileMenu.addAction(@exit_action)
 		
 		generate_menu(menuBar(),'../prog')
@@ -415,6 +421,10 @@ class SocialRobot < Qt::MainWindow
 
   def database_lists
     UserTable.show
+  end
+
+  def search_peoples
+    run_script_by_name("../prog/Vkontakte/Peoples/Search peoples.rb")
   end
 
   def new_tab(name,task)
