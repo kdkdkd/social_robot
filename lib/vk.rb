@@ -616,7 +616,10 @@ module Vkontakte
       progress "Get sid..."
       res = nil
       begin
-        res = Mechanize.new.post("http://login.userapi.com/auth",{"site" => "2" , "id" => "0" , "fccode" => "0", "fcsid" => "0","login" => "force", "email" => email, "pass" => password }).uri.to_s.scan(/sid\=([^\&]+)/)[0][0]
+        a = Mechanize.new
+        a.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+        a.agent.http.retry_change_requests = true
+        res = a.post("http://login.userapi.com/auth",{"site" => "2" , "id" => "0" , "fccode" => "0", "fcsid" => "0","login" => "force", "email" => email, "pass" => password }).uri.to_s.scan(/sid\=([^\&]+)/)[0][0]
         res = nil if(res.match(/^\-/))
       rescue
         res = nil
@@ -1459,34 +1462,74 @@ module Vkontakte
       day = hash_qparams["День рождения"]
       from != to || sex.nil? || month.nil? || day.nil?
     end
-    def User.divide_hash(hash_qparams)
+
+    def User.divide_hash(hash_qparams,size)
       from =  hash_qparams["От"] || 12
       to =  hash_qparams["До"] || 80
       sex = hash_qparams["Пол"]
       month = hash_qparams["Месяц рождения"]
       day = hash_qparams["День рождения"]
-      if(from != to)
+      split_method = nil
+      if(size > 30000 )
+        if(day.nil?)
+          split_method = "day"
+        elsif(month.nil?)
+          split_method = "month"
+        elsif(sex.nil?)
+          split_method = "sex"
+        elsif(from != to)
+          split_method = "age"
+        end
+      elsif(size > 10000)
+        if(month.nil?)
+          split_method = "month"
+        elsif(sex.nil?)
+          split_method = "sex"
+        elsif(from != to)
+          split_method = "age"
+        elsif(day.nil?)
+          split_method = "day"
+        end
+      else
+
+        if(sex.nil?)
+          split_method = "sex"
+        elsif(from != to)
+          split_method = "age"
+        elsif(month.nil?)
+            split_method = "month"
+        elsif(day.nil?)
+          split_method = "day"
+
+        end
+      end
+
+
+
+
+      case split_method
+      when "age" then
         split = (to - from) /2
-        hash1 = hash_qparams.clone
+        hash1 = hash_qparams.dup
         hash1["От"] = from
         hash1["До"] = from + split
-        hash2 = hash_qparams.clone
+        hash2 = hash_qparams.dup
         hash2["От"] = from + split + 1
         hash2["До"] = to
         return [hash1,hash2]
-      elsif sex.nil?
-        hash1 = hash_qparams.clone
+      when "sex" then
+        hash1 = hash_qparams.dup
         hash1["Пол"] = "Мужской"
-        hash2 = hash_qparams.clone
+        hash2 = hash_qparams.dup
         hash2["Пол"] = "Женский"
         return [hash1,hash2]
-      elsif month.nil?
+      when "month" then
         res = []
         (1..12).each{|m|hash1 = hash_qparams.clone;hash1["Месяц рождения"] = m;res<<hash1}
         return res
-      elsif day.nil?
+      when "day" then
         res = []
-        (1..[nil, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month]).each{|d|hash1 = hash_qparams.clone;hash1["День рождения"] = d;res<<hash1}
+        (1..((month.nil?)?31:([nil, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month]))).each{|d|hash1 = hash_qparams.clone;hash1["День рождения"] = d;res<<hash1}
         return res
 
       else
@@ -1499,6 +1542,9 @@ module Vkontakte
 
     def User.force_all_searches(query = '', size = 50, hash_qparams = {}, connector=nil)
       if(size<=1000) || !User.can_divide_hash(hash_qparams)
+        res = safe{User.all_offset(query,0,hash_qparams,connector,true)}
+        size = (res[3]>1000)?1000:res[3] if !res.nil? && !res[3].nil?
+        progress :search_fit_progress,size
         res_total = [{"params" => hash_qparams,"size" => size}]
         return res_total
       end
@@ -1525,9 +1571,11 @@ module Vkontakte
       progress :search_divide_progress,res[3].to_s
       res_total = []
 
-      User.divide_hash(hash_qparams).each do |hash_divided|
+      User.divide_hash(hash_qparams,res[3]).each do |hash_divided|
         all_length = res_total.inject(0){|sum,h|sum += h["size"];sum}
-        res_total +=(User.force_all_searches(query,size - all_length,hash_divided,connector))
+        if(size - all_length>0)
+          res_total +=(User.force_all_searches(query,size - all_length,hash_divided,connector))
+        end
       end
       res_total
     end
@@ -1536,9 +1584,10 @@ module Vkontakte
       User.find_city(hash_qparams,forсe_login(connector))
       progress "Searching users #{query}..."
       res_all = []
-
+      puts hash_qparams
       index = offset
       while true do
+
         res = User.all_offset(query,index,hash_qparams,connector,false)
         sleep 0.3
         progress "Searching users #{query} offset #{index}..."
@@ -1557,7 +1606,6 @@ module Vkontakte
         end
       end
       res_all = res_all[0,size] if(res_all.length>size)
-      return res_all if(res_all.length>0)
 
       return res_all
     end

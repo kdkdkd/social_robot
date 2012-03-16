@@ -45,6 +45,10 @@ class SocialRobot < Qt::MainWindow
 
         end
       end
+      begin
+        FileUtils.rm_rf(file)
+      rescue
+      end
 
       split = content.split("<!!MESSAGE!!>")
 
@@ -84,10 +88,7 @@ class SocialRobot < Qt::MainWindow
         end
       end
 
-      begin
-        FileUtils.rm_rf(file)
-      rescue
-      end
+
 		end
 	end
 	
