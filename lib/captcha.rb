@@ -5,6 +5,7 @@ class Antigate
 	def self.solve(captcha_file,key)
 		
 		agent = Mechanize.new
+    @agent.agent.http.retry_change_requests = true
 		f = File.new(captcha_file, "rb")
 		res_post_captcha = agent.post('http://antigate.com/in.php', {"key" => key,"file"=>f, "method" => "post", "soft_id" => "360"}).body
 		f.close

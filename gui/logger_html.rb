@@ -46,6 +46,7 @@
    when :need_phone then res = "Нужен телефон"
    
      when :able_to_send_message then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит сообщений"
+     when :able_to_invite_to_group then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит приглашения в группы"
 
      when :search_divide_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов. разбиваю..."
      when :search_fit_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов."
