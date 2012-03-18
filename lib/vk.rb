@@ -281,7 +281,7 @@ module Vkontakte
 
   class Connect
     attr_reader :uid
-    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message, :able_to_invite_to_group
+    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message, :able_to_invite_to_group, :able_to_invite_friend, :invite_box
 
 
     def cookie
@@ -299,6 +299,8 @@ module Vkontakte
     def initialize(login = nil, password = nil)
       @able_to_send_message = true
       @able_to_invite_to_group = true
+      @able_to_invite_friend = true
+      @invite_box = {}
       new_agent
 
       if(@@use_proxy && @@proxy_list.length>0)
@@ -804,7 +806,7 @@ module Vkontakte
     def set(id,name=nil,connect=nil)
       @id = id.to_s
       @name = name
-      @connect = (connect)? connect:Vkontakte::last_connect
+      @connect = connect
       self
     end
 
@@ -947,9 +949,9 @@ module Vkontakte
       return unless group_hash
       progress "Entering group #{id} ..."
       if(type=="group")
-        connect.post('/al_groups.php',{"act" => "enter", "al" => "1", "gid" => id , "hash" => group_hash})
+        @connect.post('/al_groups.php',{"act" => "enter", "al" => "1", "gid" => id , "hash" => group_hash})
       else
-        connect.post('/al_public.php',{"act" => "a_enter", "al" => "1", "pid" => id , "hash" => group_hash})
+        @connect.post('/al_public.php',{"act" => "a_enter", "al" => "1", "pid" => id , "hash" => group_hash})
       end
       @connect = old_connect
       progress :group_entered,self
@@ -981,18 +983,15 @@ module Vkontakte
       end
       progress "Inviting to group(#{user.id})..."
 
-      @invite_box = {} unless @invite_box
-      unless(@invite_box[@connect.uid])
-        @invite_box[@connect.uid] = @connect.post('/al_page.php', {'act' => 'a_invite_box', 'al' => '1', 'gid' => id})
+
+      unless(@connect.invite_box[id])
+        @connect.invite_box[id] = @connect.post('/al_friends.php', {'act' => 'load_friends_silent', 'al' => '1', 'gid' => id, 'id' => @connect.uid})
         sleep @@invite_interval
       end
 
-
-      @invite_box[@connect.uid].scan(/page\.inviteToGroup\(([^\)]*)\)/).each do |arg|
-        args = arg[0].split(",").map{|x|x.strip}
-        correct_args = args.find{|x| x.gsub("'",'').gsub("\"",'') == user.id}
-        if(correct_args)
-          hash = args.last.gsub("'",'')
+      user_row = @connect.invite_box[id].scan(Regexp.new(user.id + '([^\]]+)'))[0]
+        if(user_row)
+          hash = user_row[0].split(",").last.gsub("'","").gsub("\"","")
 
           captcha_sid = nil
           captcha_key = nil
@@ -1008,7 +1007,7 @@ module Vkontakte
               break
             elsif(res_post =~ /\d{12}/)
               captcha_sid = res_post[/\d{12}/]
-              captcha_key = connect.ask_captcha_internal(captcha_sid)
+              captcha_key = @connect.ask_captcha_internal(captcha_sid)
             elsif(res_post =~ /per\sday/)
               @connect.able_to_invite_to_group = false
               progress :able_to_invite_to_group,@connect
@@ -1018,10 +1017,9 @@ module Vkontakte
             end
           end
           @connect.last_user_invite = Time.new
-          break
-        end
+          @connect = old_connect
       end
-      @connect = old_connect
+
     end
 
   end
@@ -1220,7 +1218,7 @@ module Vkontakte
         @avatar_string = nil
       end
       begin
-        @friend_hash = resp.scan(/toggleFriend\(this\,\s*\'([^\']*)\'/)[0][0]
+        @friend_hash = resp.scan(/toggleFriend\(this\,\s*\'([^\']*)\'\s*\,\s*1/)[0][0]
       rescue
         @friend_hash = nil
       end
@@ -1405,11 +1403,13 @@ module Vkontakte
         diff = Time.new - @connect.last_user_invite
         sleep(@@invite_interval - diff) if(diff<@@invite_interval)
       end
+      return unless (@connect.able_to_invite_friend)
       progress "Inviting #{@id}..."
 
+
       fh = friend_hash
+      sleep @@invite_interval
       unless fh
-        @connect.last_user_invite = Time.new
         @connect = connect_old
         return
       end
@@ -1428,8 +1428,10 @@ module Vkontakte
           a = res.split("<!>")
           captcha_sid = a[a.length-2]
           if captcha_sid.to_i < 100
+            @connect.able_to_invite_friend = false
+            progress :able_to_invite_friend,@connect
             @connect = connect_old
-            progress :warning_invite,self
+            return
           end
           captcha_key = @connect.ask_captcha_internal(captcha_sid)
         end

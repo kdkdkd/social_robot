@@ -38,7 +38,7 @@
 	 
 	 when :exception_antigate then res = "Ошибка с сервисом antigate.com: #{args[1].message}"
 	 when :exception then res = "Error : <font color='red' size='3'>#{args[1].message}</font><br/>#{args[1].backtrace.map{|x| "<font color='grey' size='2'>" + x + "</font>"}.join("<br/>")}"
-	 when :warning_invite then res = "Предупреждение : количество на сегодня приглашений исчерпано"
+
    when :search_users then res = "Запущен поиск по группе #{args[1].pretty_string}, это может занять довольно долгое время..."
    when :try_proxy then res = "Пробую прокси #{args[1]}"
    when :ok_proxy then res = "Прокси подходит #{args[1]}"
@@ -47,6 +47,7 @@
    
      when :able_to_send_message then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит сообщений"
      when :able_to_invite_to_group then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит приглашения в группы"
+     when :able_to_invite_friend then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит приглашения в друзья"
 
      when :search_divide_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов. разбиваю..."
      when :search_fit_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов."

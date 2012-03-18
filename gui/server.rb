@@ -280,10 +280,11 @@ class User
     res = []
     "Предварительный поиск".print
     all_no_offset = User.force_all_searches(query,size + offset,hash_qparams,connector)
-    "Будет найдено приблизительно #{all_no_offset.inject(0){|sum,h|sum += h["size"];sum}} результатов. Начинаю...".print
+
     all_no_offset.reverse!
     all = []
     offset_achieved = 0
+    size_achieved = 0
     all_no_offset.each do |h|
 
       if offset_achieved <  offset
@@ -294,17 +295,28 @@ class User
           h_new["offset"] = offset - offset_achieved
           h_new["size"] = h["size"] - (offset - offset_achieved)
           offset_achieved = offset
+          size_achieved += h_new["size"]
           all << h_new
+          if(size_achieved>size)
+            h_new["size"] -= size_achieved - size
+            break
+          end
+
         end
       else
         h_new = h.clone
 
         h_new["offset"] = 0
-        #log h_new
+        size_achieved += h_new["size"]
         all << h_new
+        if(size_achieved>size)
+          h_new["size"] -= size_achieved - size
+          break
+        end
+
       end
     end
-
+    "Будет найдено приблизительно #{all.inject(0){|sum,h|sum += h["size"];sum}} результатов. Начинаю...".print
     threads_search = []
     Users.users do |u|
       user_continue = true

@@ -1,53 +1,33 @@
-#Спросить, какое сообщение отправлять
-result_ask = ask("Сообщение.\n\n#{aviable_text_features}" => "text","Адрес видео\nvk.com/video9490653_160343384" => "string", "Название музыки в вашем списке(можно пустое)" => "string","Адрес фотографии\n например vk.com/photo9490653_247429819\nможно пустое" => "string")
-
-message = result_ask[0]
-
-
-#Найти  видео
-video =  result_ask[1]
-if(video.length>0)
-   video = Video.parse(video).attach_code
-else
-   video = nil
-end
-
-
-#Найти музыку
-music =  result_ask[2]
-if(music.length>0)
-   music = me.music.one(music).attach_code
-else
-   music = nil
-end
-
-
-#Найти фото
-photo =  result_ask[3]
-if(photo.length>0)
-    photo = Image.parse(photo).attach_code
-else
-    photo = nil
-end
-
-#Получаем список друзей
+#Получить список друзей
 friends = me.friends
 
+#Имена друзей
+names_all = friends.map{|friend| friend.name}
+
+#Если друзей слишком много - отсеиваем
+c = names_all.length / 100
+c = 1 if c==0
+names = []
+names_all.each_with_index{|friend_name,i| names << friend_name if i%c == 0}
+
+#Спросить, какое сообщение отправлять
+result_ask = ask_media("Сообщение.\n\n#{aviable_text_features}" => "text", "Имя друга с которого начать"=>{"Type" => "combo","Values" => names })
+message = result_ask[0][0]
+name = result_ask[0][1]
+media = parse_media(result_ask[1],me)
+
+
+#Обрезаем масив
+friends = friends[friends.index{|friend|friend.name==name}..friends.length-1]
 
 #Для каждого друга
 friends.each_with_index do |friend,index|
    
    #Копируем сообщение
    message_actual = sub(message,friend)
-
-   #Игнорируем ошибки
-   safe{
-         #Шлем сообщение другу
-         post = friend.post(message_actual,photo,video,music)
-
-         #Ставим лайк
-         post.like if post
-   }
+    
+   #Шлем сообщение другу
+   mail = safe{friend.post(message_actual,media[0],media[1],media[2])}
 
    #Обновляем прогресс бар
    total(index,friends.length)
