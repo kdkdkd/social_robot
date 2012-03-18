@@ -9,12 +9,18 @@ while true
            #Существует ли такая группа?
            group = Group.id(last)
 
-           #Если группа открыта
-           if group.open
+
+
+           #Игнорируем ошибки
+           safe do
+
+                  #Если группа открыта
+                  if group.open
           
-               #Войти
-               group.enter
+                    #Войти
+                    group.enter
           
+                  end
           end
      
           #Перейти к следующей

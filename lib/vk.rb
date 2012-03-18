@@ -952,13 +952,39 @@ module Vkontakte
     def enter(connector=nil)
       old_connect = @connect
       @connect = forсe_login(connector,@connect)
+      @info = nil
+      @group_hash = nil
       return unless group_hash
+      sleep 1
       progress "Entering group #{id} ..."
-      if(type=="group")
-        @connect.post('/al_groups.php',{"act" => "enter", "al" => "1", "gid" => id , "hash" => group_hash})
-      else
-        @connect.post('/al_public.php',{"act" => "a_enter", "al" => "1", "pid" => id , "hash" => group_hash})
+      captcha_sid = nil
+      captcha_key = nil
+      while true
+
+        if(type=="group")
+          hash = {"act" => "enter", "al" => "1", "gid" => id , "hash" => group_hash}
+          dest = '/al_groups.php'
+        else
+          hash = {"act" => "a_enter", "al" => "1", "pid" => id , "hash" => group_hash}
+          dest = '/al_public.php'
+        end
+        unless(captcha_key.nil?)
+          hash["captcha_sid"] = captcha_sid
+          hash["captcha_key"] = captcha_key
+        end
+        res = connect.post(dest, hash)
+        if(res.index("<div"))
+          break
+        else
+          a = res.split("<!>")
+          captcha_sid = a[a.length-2]
+          captcha_key = connect.ask_captcha_internal(captcha_sid)
+        end
       end
+      sleep 1
+
+
+
       @connect = old_connect
       progress :group_entered,self
     end

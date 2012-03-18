@@ -211,7 +211,7 @@ class SocialRobot < Qt::MainWindow
 
 		@all_tabs.addTab(@task_table,"Диспетчер задач")
 		@all_tabs.addTab(@log_edit,"Помощь")
-    
+    @all_tabs.currentIndex = 1
 
 
 		#Allow dock widgets to be movable
@@ -407,7 +407,7 @@ class SocialRobot < Qt::MainWindow
 		Qt::Object.connect(@timer_tasks_update, SIGNAL("timeout()"), invoke_tasks_update, SLOT("invoke()"))
 		@timer_tasks_update.start(5000)
 
-		@log_edit.append("<font color='black' size='3'>Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Или нажмите на кнопку <img src=\"images/vkontakte.png\"/> Это покажет Вас и Ваших друзей и абсолютно безобидно.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a></font>")
+		@log_edit.append("<font color='black' size='3'>Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Или нажмите на кнопку <img src=\"images/vkontakte.png\"/> Это покажет Вас и Ваших друзей и абсолютно безобидно.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a><br><br><br>Список изменений <a href=\"https://twitter.com/#!/socialrobot_net\">https://twitter.com/#!/socialrobot_net</a></font>")
 		
 		update_developer_mode()
 		
