@@ -10,7 +10,7 @@ current_all =0
 
 check_users do |user|
 
-		media = parse_media(result_ask[1],user)
+		media = parse_media(result_ask[1],user,"mail")
 		
 		#Получить список друзей
 		friends = safe{user.friends}

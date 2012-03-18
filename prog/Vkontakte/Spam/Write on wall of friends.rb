@@ -14,7 +14,7 @@ names_all.each_with_index{|friend_name,i| names << friend_name if i%c == 0}
 result_ask = ask_media("Сообщение.\n\n#{aviable_text_features}" => "text", "Имя друга с которого начать"=>{"Type" => "combo","Values" => names })
 message = result_ask[0][0]
 name = result_ask[0][1]
-media = parse_media(result_ask[1],me)
+media = parse_media(result_ask[1],me,"wall")
 
 
 #Обрезаем масив

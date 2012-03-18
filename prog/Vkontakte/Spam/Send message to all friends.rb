@@ -15,7 +15,7 @@ result_ask = ask_media("Тема" => "string" , "Сообщение.\n\n#{aviabl
 title = result_ask[0][0]
 message = result_ask[0][1]
 invisible = result_ask[0][2]
-media = parse_media(result_ask[1],me)
+media = parse_media(result_ask[1],me,"mail")
 
 #Выбрать друга
 name = result_ask[0][2]

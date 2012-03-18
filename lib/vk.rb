@@ -25,7 +25,11 @@ module Vkontakte
       captcha_key = nil
       @post_hash = nil
       @info = nil
+
       return nil unless post_hash
+
+      return nil unless(@able_to_post)
+      sleep Vkontakte::post_interval
       while true
         hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id_to_post, "type" => "all" }
         attach_number = 1
@@ -458,7 +462,9 @@ module Vkontakte
         if(res.index('"post_hash"') || res.index('"profile_deleted_text"') || res.index('"profile_blocked"'))
           not_ok = false
         else
+          return nil if(sleep>200)
           sleep sleep_time
+
           sleep_time *= 10
         end
       end
@@ -878,7 +884,7 @@ module Vkontakte
         return
       end
 
-
+      @able_to_post = !resp.index("wall.sendPost").nil?
       @post_hash = User.get_post_hash(resp)
       begin
 
@@ -1205,12 +1211,14 @@ module Vkontakte
       name_new = html.xpath("//title").text
       @name = name_new
 
-      @deleted = html.xpath("//div[@class='profile_deleted']").length==1
+      @deleted = html.xpath("//div[@class='profile_deleted']").length==1 || html.xpath("//div[@class='profile_blocked']").length==1
       if @deleted
+        @able_to_post = false
         @post_hash = nil
         @info = {}
         return @info
       end
+      @able_to_post = !resp.index("wall.sendPost").nil?
       @post_hash = User.get_post_hash(resp)
       begin
         @avatar_string = html.xpath("//div[@id='profile_avatar']/a[@id='profile_photo_link']")[0]["href"]
@@ -1223,11 +1231,11 @@ module Vkontakte
         @friend_hash = nil
       end
 
-      hash = {"статус" => html.xpath("//div[@id='profile_current_info']").text}
+      hash_info = {"статус" => html.xpath("//div[@id='profile_current_info']").text}
       h1 = html.xpath("//div[@class='label fl_l']").map{|div| div.text}
       h2 = html.xpath("//div[@class='labeled fl_l']").map{|div| div.text}
-      h1.each_with_index{|name,index| hash[name.chomp(":")] = h2[index]}
-      @info = hash
+      h1.each_with_index{|name,index| hash_info[name.chomp(":")] = h2[index]}
+      @info = hash_info
     end
 
     def music
@@ -1315,12 +1323,20 @@ module Vkontakte
         was_attach = false
         hash["media"] = ""
         if(attach_photo)
-          hash["media"] = "photo#{attach_photo}"
+          attach_photo_out = attach_photo
+          if(!attach_photo.start_with?("-"))
+            attach_photo_out = ":" + attach_photo
+          end
+          hash["media"] = "photo#{attach_photo_out}"
           was_attach = true
         end
         if(attach_video)
+          attach_video_out = attach_video
+          if(!attach_video.start_with?("-"))
+            attach_video_out = ":" + attach_video
+          end
           hash["media"] += "," if was_attach
-          hash["media"] += "video#{attach_video}"
+          hash["media"] += "video#{attach_video_out}"
           was_attach = true
         end
         if(attach_music)
@@ -2043,11 +2059,71 @@ module Vkontakte
       if(res)
         res = res[0]
         res.gsub!("photo","")
-        if(!res.start_with?("-"))
-          res = ":" + res
-        end
       end
       res
+    end
+
+    def Image.upload_mail(file,connector = nil)
+      Image.upload_universal(file,"-3",connector)
+
+    end
+
+    def Image.upload_mail(file,connector = nil)
+      connect = forсe_login(connector)
+      return false unless connect.login
+      res_total = nil
+
+      if(file.class.name == "Array")
+        filenames = file
+        many = true
+        res_total = []
+      else
+        filenames = [file]
+        many = false
+      end
+
+      filenames.each do |filename|
+        safe{
+          progress "Uploading #{filename} ..."
+
+
+          get = connect.post("/photos.php",{"act" => "a_choose_photo_box", "al" => "1", "mail_add" => "1", "scrollbar_width" => "16"})
+
+          scan = get.scan(/Upload\.init\(\'?\"?choose_photo_upload\'?\"?\s*\,\s*\'?\"?([^\'\"]+)\'?\"?\s*,\s*(\{[^\}]+\})/)[0]
+          addr = scan[0]
+          fields = JSON.parse(scan[1])
+
+
+          params = {"oid" => connect.uid, "aid" => "-3", "gid" => "0", "mid" => connect.uid, "hash" => fields["hash"], "rhash" => fields["rhash"], "act" => "do_add", "ajx" => "1"}
+          res = nil
+          safe_file_name(filename) do |file_safe|
+            f = File.new(file_safe, "rb")
+            params["photo"] = f
+
+            #Uploading photo
+            res = connect.post(addr,params)
+            f.close
+          end
+
+          #Asking for photo parameters
+          hash = res.scan(/hash\=([^\&]+)/)[0][0]
+          photos = res.scan(/photos\=([^\&]+)/)[0][0]
+          server = res.scan(/server\=([^\&]+)/)[0][0]
+
+
+          params = {"photos" => photos,"server" => server,"from" => "html5","context" => "1", "al" => "1", "aid" => "-3", "gid" => "0", "mid" => connect.uid, "hash" => hash, "act" => "choose_uploaded"}
+          res = connect.post('/al_photos.php',params)
+
+          res_internal = res.split("<!>")[5]
+          if many
+            res_total.push(res_internal)
+          else
+            res_total = res_internal
+          end
+          progress :photo_uploaded,res_internal
+        }
+      end
+      res_total
     end
 
     def Image.parse(href)
@@ -2261,8 +2337,8 @@ module Vkontakte
       if(res)
         res = res[0]
         res.gsub!("video","")
-        if(!res.start_with?("-"))
-          res = ":" + res
+        unless(res.start_with?("-"))
+          res.gsub!("%2F","")
         end
       end
       res

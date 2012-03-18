@@ -4,7 +4,7 @@ title = result_ask[0][0]
 message = result_ask[0][1]
 invisible = result_ask[0][2]
 
-media = parse_media(result_ask[1],me)
+media = parse_media(result_ask[1],me,"mail")
 
 #Найти людей
 peoples = ask_peoples

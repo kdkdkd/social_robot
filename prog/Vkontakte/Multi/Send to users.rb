@@ -25,7 +25,7 @@ check_users do |user_out|
 
 		media_out = [nil,nil,nil]
 		
-		safe{media_out = parse_media(result_ask[1],user_out)}
+		safe{media_out = parse_media(result_ask[1],user_out,"mail")}
 
 		thread(user_out,media_out) do |user,media|
 			

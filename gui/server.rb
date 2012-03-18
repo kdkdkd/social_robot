@@ -208,7 +208,7 @@ end
 
 	end
 
-	def parse_media(result_ask,user)
+	def parse_media(result_ask,user,type)
 
 		video =  result_ask[0]
 		video_you =  result_ask[1]
@@ -239,7 +239,13 @@ end
 								if(photo.length>0)
 											photo_code = Image.get_attach_code(photo)
 								elsif(photo_local.length>0)
-											photo_code = Album.create("Новый","альбом",user).upload(photo_local,"").attach_code
+										if(type == "mail")
+                        photo_code = Image.upload_mail(photo_local,user)
+                      elsif
+                        photo_code = Album.create("Новый","альбом",user).upload(photo_local,"").attach_code
+                    end
+
+
 								end
 		[photo_code,video_code,music_code]
 
