@@ -1448,7 +1448,7 @@ module Vkontakte
       return unless (@connect.able_to_invite_friend)
       progress "Inviting #{@id}..."
 
-
+      @info = nil
       fh = friend_hash
       sleep @@invite_interval
       unless fh
