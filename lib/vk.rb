@@ -14,6 +14,11 @@ module Vkontakte
     def post(msg, attach_photo = nil, attach_video = nil, attach_music = nil ,connector=nil)
       connect_old = @connect
       @connect = forсe_login(connector,@connect)
+	  unless @connect.able_to_post_on_wall
+		@connect = connect_old
+		return  
+	  
+	  end
 
       if(@connect.last_user_post)
         diff = Time.new - @connect.last_user_post
@@ -62,7 +67,13 @@ module Vkontakte
         else
           a = res.split("<!>")
           captcha_sid = a[a.length-2]
-          if captcha_sid.to_i < 100
+          if(captcha_sid == "8")
+			@connect.able_to_post_on_wall = false
+			progress :able_to_post_on_wall,@connect
+			return_value = nil
+            break
+		  end
+		  if captcha_sid.length != 12
             return_value = nil
             break
           end
@@ -285,7 +296,7 @@ module Vkontakte
 
   class Connect
     attr_reader :uid
-    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message, :able_to_invite_to_group, :able_to_invite_friend, :invite_box
+    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message, :able_to_invite_to_group, :able_to_invite_friend, :invite_box, :able_to_post_on_wall
 
 
     def cookie
@@ -304,6 +315,7 @@ module Vkontakte
       @able_to_send_message = true
       @able_to_invite_to_group = true
       @able_to_invite_friend = true
+	  @able_to_post_on_wall = true
       @invite_box = {}
       new_agent
 
@@ -462,10 +474,12 @@ module Vkontakte
         if(res.index('"post_hash"') || res.index('"profile_deleted_text"') || res.index('"profile_blocked"'))
           not_ok = false
         else
-          return nil if(sleep_time>200)
+          return nil unless res.index("<title>Помилка</title>") || res.index("<title>Ошибка</title>") || res.index("<title>Error</title>")
+		  
+		  return nil if(sleep_time>2000)
           sleep sleep_time
 
-          sleep_time *= 10
+          sleep_time *= 2
         end
       end
       @last_user_fetch_date = Time.new
@@ -842,6 +856,8 @@ module Vkontakte
       info
       @name
     end
+	
+	
 
     def post_hash
       return @post_hash if @post_hash
@@ -1219,18 +1235,30 @@ module Vkontakte
         @connect.silent_post('/al_friends.php', {"act" => "load_friends_silent","al" => "1","id"=>id,"gid"=>"0"}).map{|x| User.new.set(x[0],x[4],@connect)}
       end
     end
+	
+	def able_to_post
+	  return @able_to_post if @able_to_post
+      info
+      @able_to_post
+	end
 
     def info
       return @info if @info
-	  return {} unless @id
+	  return {} if @deleted
       return false unless @connect.login
       return {} unless @connect.login
       progress "Fetching user info #{@id} ..."
 
       resp = @connect.get_user(@id.to_s)
       if resp.nil?
-        @id = nil
-        return {}
+        @able_to_post = false
+        @post_hash = nil
+		@info = {}
+		@deleted = true
+		@name = ""
+        return @info
+	  else
+		@deleted = false
       end
       @online = !resp.index("<b class=\"fl_r\">Online</b>").nil?
       @id = User.get_id_by_user_page(resp) unless @id.to_s =~ /^\d+$/
@@ -1238,14 +1266,8 @@ module Vkontakte
       name_new = html.xpath("//title").text
       @name = name_new
 
-      @deleted = html.xpath("//div[@class='profile_deleted']").length==1 || html.xpath("//div[@class='profile_blocked']").length==1
-      if @deleted
-        @able_to_post = false
-        @post_hash = nil
-		@id = nil
-        @info = {}
-        return @info
-      end
+      
+      
       @able_to_post = !resp.index("wall.sendPost").nil?
       @post_hash = User.get_post_hash(resp)
       begin

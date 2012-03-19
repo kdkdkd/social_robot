@@ -11,7 +11,7 @@ peoples.each_with_index do |people,index|
 	message_actual = sub(message,people)
 
 	#Пригласить
-	people.invite(message_actual)
+	safe{people.invite(message_actual)}
 
 	#Обновить прогресс бар
 	total(index,peoples.length)
