@@ -1222,6 +1222,7 @@ module Vkontakte
 
     def info
       return @info if @info
+	  return {} unless @id
       return false unless @connect.login
       return {} unless @connect.login
       progress "Fetching user info #{@id} ..."
@@ -1241,6 +1242,7 @@ module Vkontakte
       if @deleted
         @able_to_post = false
         @post_hash = nil
+		@id = nil
         @info = {}
         return @info
       end
@@ -1758,7 +1760,7 @@ module Vkontakte
     end
 
     def firstname
-      name.split(/\s+/).first
+      name.to_s.split(/\s+/).first
     end
 
     def User.parse(href)

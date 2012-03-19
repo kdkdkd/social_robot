@@ -423,8 +423,13 @@ end
 
 def sub(original,friend)
 	message_actual = original.dup
-	message_actual.gsub!("$Имя",friend.firstname)
-	message_actual.gsub!("$ИмяФамилия",friend.name)
+	if(friend.name)
+		message_actual.gsub!("$Имя",friend.firstname)
+		message_actual.gsub!("$ИмяФамилия",friend.name)
+	else
+		message_actual.gsub!("$Имя","")
+		message_actual.gsub!("$ИмяФамилия","")
+	end
 	message_actual.gsub!(/\{([^\}]+)\}/)do |match|
 		match.gsub("{","").gsub("}","").split("|").sample
 	end
