@@ -1252,7 +1252,7 @@ module Vkontakte
         @avatar_string = nil
       end
       begin
-        @friend_hash = resp.scan(/toggleFriend\(this\,\s*\'([^\']*)\'\s*\,\s*1/)[0][0]
+        @friend_hash = resp.scan(/toggleFriend\(this\,\s*\'?\"?([^\'\"]+)\'?\"?\s*\,\s*1/)[0][0]
       rescue
         @friend_hash = nil
       end
@@ -1467,11 +1467,16 @@ module Vkontakte
         if(res.index("<div"))
           break
         else
+
           a = res.split("<!>")
           captcha_sid = a[a.length-2]
           if captcha_sid.to_i < 100
             @connect.able_to_invite_friend = false
             progress :able_to_invite_friend,@connect
+            @connect = connect_old
+            return
+          end
+          if captcha_sid.length != 12
             @connect = connect_old
             return
           end
