@@ -462,7 +462,7 @@ module Vkontakte
         if(res.index('"post_hash"') || res.index('"profile_deleted_text"') || res.index('"profile_blocked"'))
           not_ok = false
         else
-          return nil if(sleep>200)
+          return nil if(sleep_time>200)
           sleep sleep_time
 
           sleep_time *= 10
