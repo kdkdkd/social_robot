@@ -296,7 +296,7 @@ module Vkontakte
 
   class Connect
     attr_reader :uid
-    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message, :able_to_invite_to_group, :able_to_invite_friend, :invite_box, :able_to_post_on_wall
+    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message, :able_to_invite_to_group, :able_to_invite_friend, :invite_box, :able_to_post_on_wall, :able_to_like
 
 
     def cookie
@@ -312,6 +312,7 @@ module Vkontakte
     end
 
     def initialize(login = nil, password = nil)
+      @able_to_like = true
       @able_to_send_message = true
       @able_to_invite_to_group = true
       @able_to_invite_friend = true
@@ -1906,7 +1907,34 @@ module Vkontakte
       return false unless connect.login
       return false unless like_hash
       progress "Like post #{id} ..."
-      res_post = connect.post("/like.php",{"act" => "a_do_like", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user.id}_#{id}","wall"=>"1"})
+
+      if(connect.last_user_like)
+        diff = Time.new - connect.last_user_like
+        sleep(@@like_interval - diff) if(diff<@@like_interval)
+      end
+
+      captcha_sid = nil
+      captcha_key = nil
+      while true
+        hash = {"act" => "a_do_like", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user.id}_#{id}","wall"=>"1"}
+
+
+        unless(captcha_key.nil?)
+          hash["captcha_sid"] = captcha_sid
+          hash["captcha_key"] = captcha_key
+        end
+        res = connect.post("/like.php",hash)
+        if(res[/\d{12}/])
+          a = res.split("<!>")
+          captcha_sid = a[a.length-2]
+
+          captcha_key = connect.ask_captcha_internal(captcha_sid)
+
+        else
+          break
+        end
+      end
+      connect.last_user_like = Time.new
       progress :post_like,self
     end
 
@@ -2035,7 +2063,7 @@ module Vkontakte
           params = {"photos" => photos,"server" => server,"from" => "html5","context" => "1", "al" => "1", "aid" => id, "gid" => "0", "mid" => user.id, "hash" => hash, "act" => "done_add"}
           res = connect.post('/al_photos.php',params)
           hash = res.scan(/deletePhoto[^\,]+\,\s*([^\)]+)/)[0][0].gsub("\"",'').gsub("'",'')
-          res_internal = Image.new.set(self,res.split("<!>").last.split("_").last,res.scan(/src\=\s*\"([^\"]+)\"/)[0][0].gsub("\"","").gsub("'",""),hash,true,connect)
+          res_internal = Image.new.set(self,res.split("<!>").last.split("_").last,res.scan(/src\=\s*\"([^\"]+)\"/)[0][0].gsub("\"","").gsub("'",""),hash,true,false,connect)
           if many
             res_total.push(res_internal)
           else
@@ -2066,7 +2094,7 @@ module Vkontakte
             b = true
             break
           end
-          array.push(Image.new.set(self,id,el['x_src'],el['hash'],!(el["actions"]["comm"].nil?),connect))
+          array.push(Image.new.set(self,id,el['x_src'],el['hash'],!(el["actions"]["comm"].nil?),el["liked"].to_s == "1",connect))
           array
         end
         break if b
@@ -2093,13 +2121,14 @@ module Vkontakte
   end
 
   class Image
-    attr_accessor :id, :album, :connect, :link, :hash_vk, :open
-    def set(album,id,link,hash_vk,open,connect)
+    attr_accessor :id, :album, :connect, :link, :hash_vk, :open, :liked
+    def set(album,id,link,hash_vk,open,liked,connect)
       @id = id
       @album = album
       @connect = connect
       @link = link
       @open = open
+      @liked = liked
       @hash_vk = hash_vk
       self
     end
@@ -2189,12 +2218,13 @@ module Vkontakte
       resp = connect.post('/al_photos.php', {"act" => "show","al" => "1","photo" => id_complex})
       json = JSON.parse(resp.split("<!>").find{|x| x.index('"id"')}.gsub("<!json>","")).find{|x| x["id"] == id_complex}
       album_response = Album.parse("/" + resp.split("<!>").find{|x| x.index("album")})
-      Image.new.set(album_response,id_complex_split.last,json["x_src"],json["hash"],!(json["actions"]["comm"].nil?),connect)
+      Image.new.set(album_response,id_complex_split.last,json["x_src"],json["hash"],!(json["actions"]["comm"].nil?),json['liked'].to_s == '1',connect)
     end
 
     def hash_vk_for_user(connector)
       resp = connector.connect.post('/al_photos.php', {"act" => "show","al" => "1","photo" => "#{album.user.id}_#{id}"})
-      JSON.parse(resp.split("<!>").find{|x| x.index('"id"')}.gsub("<!json>",""))[0]["hash"]
+      json = JSON.parse(resp.split("<!>").find{|x| x.index('"id"')}.gsub("<!json>","")).find{|x|x["id"]=="#{album.user.id}_#{id}"}
+      [json["hash"],json["liked"]]
     end
 
     def to_s
@@ -2283,21 +2313,53 @@ module Vkontakte
 
     def like(connector=nil)
       connect = forсe_login(connector,@connect)
+      return unless connect.able_to_like
       if(connector)
-        hash_current = hash_vk_for_user(connector)
+         res_current = hash_vk_for_user(connector)
+         hash_current = res_current[0]
+         return if res_current[1].to_s == "1"
       else
         hash_current = hash_vk
+        return if @liked
       end
 
       return false unless connect.login
       return false unless hash_current
       if(connect.last_user_like)
-        diff = Time.new - @connect.last_user_like
+        diff = Time.new - connect.last_user_like
         sleep(@@like_interval - diff) if(diff<@@like_interval)
       end
+
       progress "Like photo #{id}..."
-      connect.post("/like.php",{"act" => "a_do_like", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
+      captcha_sid = nil
+      captcha_key = nil
+
+      while true
+        hash = {"act" => "a_do_like", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"}
+
+
+        unless(captcha_key.nil?)
+          hash["captcha_sid"] = captcha_sid
+          hash["captcha_key"] = captcha_key
+        end
+        res = connect.post("/like.php",hash)
+        if(res[/\d{12}/])
+          a = res.split("<!>")
+          captcha_sid = a[a.length-2]
+
+          captcha_key = connect.ask_captcha_internal(captcha_sid)
+
+        elsif(res.index("<!int>"))
+          break
+        else
+          progress :able_to_like,connect
+          connect.able_to_like = false
+          return
+        end
+      end
+
       connect.last_user_like = Time.new
+      @liked = true if connector
       progress :image_like,self
     end
 
@@ -2305,7 +2367,7 @@ module Vkontakte
 
       connect = forсe_login(connector,@connect)
       if(connector)
-        hash_current = hash_vk_for_user(connector)
+        hash_current = hash_vk_for_user(connector)[0]
       else
         hash_current = hash_vk
       end
@@ -2349,9 +2411,12 @@ module Vkontakte
     def unlike(connector=nil)
       connect = forсe_login(connector,@connect)
       if(connector)
-        hash_current = hash_vk_for_user(connector)
+        res_current = hash_vk_for_user(connector)
+        hash_current = res_current[0]
+        return if res_current[1].to_s != "1"
       else
         hash_current = hash_vk
+        return unless @liked
       end
 
 
@@ -2364,7 +2429,9 @@ module Vkontakte
       progress "Unlike photo #{id}..."
       connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"photo_viewer","hash"=>hash_current,"object"=>"photo#{album.user.id}_#{id}"})
       connect.last_user_like = Time.new
+
       progress :image_unlike,self
+      @liked = false if connector
     end
 
 
