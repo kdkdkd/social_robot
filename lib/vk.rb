@@ -1035,12 +1035,17 @@ module Vkontakte
 
       unless(@connect.invite_box[id])
         @connect.invite_box[id] = @connect.post('/al_friends.php', {'act' => 'load_friends_silent', 'al' => '1', 'gid' => id, 'id' => @connect.uid})
+
         sleep @@invite_interval
       end
 
       user_row = @connect.invite_box[id].scan(Regexp.new(user.id + '([^\]]+)'))[0]
-        if(user_row)
-          hash = user_row[0].split(",").last.gsub("'","").gsub("\"","")
+      if(user_row)
+        split = user_row[0].split(",")
+
+        if(split[-2].gsub("'","").gsub("\"","").gsub(/\s/,"") == "0")
+
+          hash = split.last.gsub("'","").gsub("\"","")
 
           captcha_sid = nil
           captcha_key = nil
@@ -1051,6 +1056,7 @@ module Vkontakte
               hash_to_post["captcha_key"] = captcha_key
             end
             res_post =  @connect.post('/al_page.php', hash_to_post)
+
             if(res_post.index("<!int>1<!>"))
               progress :group_invite,self,user
               break
@@ -1067,6 +1073,7 @@ module Vkontakte
           end
           @connect.last_user_invite = Time.new
           @connect = old_connect
+        end
       end
 
     end
