@@ -51,6 +51,9 @@
      when :able_to_post_on_wall then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит отправки сообщений на стену"
      when :able_to_like then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} превысил лимит выставления сердечек"
 
+
+     when :phone_invite_to_group then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} не может пригласить в группу из-за того, что телефон не привязан"
+
      when :search_divide_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов. разбиваю..."
      when :search_fit_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов."
      when :search_progress then res = "<img src = 'images/search.png'/>Найдено #{args[1]} людей."

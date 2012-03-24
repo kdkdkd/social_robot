@@ -141,6 +141,8 @@ def ask_peoples
 	 "Возраст До"=>{"Type" => "combo","Values" => ["Не важно"] + (12..80).to_a },
    "Месяц рождения"=>{"Type" => "combo","Values" => months },
    "День рождения"=>{"Type" => "combo","Values" => ["Не важно"] + (1..31).to_a },
+   "Семейное положение"=>{"Type" => "combo","Values" => ["Не важно", "Не женат","Есть подруга","Помолвлен","Женат","Влюблён","Всё сложно","В активном поиске"] },
+
    "Страница группы.\nНапример, так http://vk.com/evil_incorparate"=>"string"
 	 }, "name" => "Поиск"},
 	 "tab1" => {"data" => "USERLIST", "name" => "Прошлые поиски"},
@@ -162,9 +164,11 @@ def ask_peoples
 		q["До"] =  r[10].to_i if r[10] != "Не важно"
 
     q["Месяц рождения"] =  months.index(r[11]) if r[11] != "Не важно"
+
     q["День рождения"] =  r[12] if r[12] != "Не важно"
-    if r[13].length>0
-      g = Group.parse(r[13])
+    q["Семейное положение"] =  r[13] if r[13] != "Не важно"
+    if r[14].length>0
+      g = Group.parse(r[14])
       q["Группа"] = g.id if g
     end
 		q["По имени"] =  (r[1] == "По имени")? "Да" : "Нет"
@@ -355,6 +359,7 @@ class User
 
     threads_search.each{|t|t.join}
     progress :search_end_progress,res.length
+    res.each{|r| r.connect = (connector)? connector.connect : me.connect }
     return res
   end
 end

@@ -1060,10 +1060,14 @@ module Vkontakte
             if(res_post.index("<!int>1<!>"))
               progress :group_invite,self,user
               break
+            elsif(res_post.split("<!>")[-2] == "12")
+              @connect.able_to_invite_to_group = false
+              progress :phone_invite_to_group,@connect
+              break
             elsif(res_post =~ /\d{12}/)
               captcha_sid = res_post[/\d{12}/]
               captcha_key = @connect.ask_captcha_internal(captcha_sid)
-            elsif(res_post =~ /per\sday/)
+            elsif(res_post =~ /per\sday/ || res_post =~ /40\s/)
               @connect.able_to_invite_to_group = false
               progress :able_to_invite_to_group,@connect
               break
@@ -1743,7 +1747,7 @@ module Vkontakte
       qhash["c[group]"] = (hash_qparams["Группа"]) if (hash_qparams["Группа"])
       qhash["c[bmonth]"] = hash_qparams["Месяц рождения"] if hash_qparams["Месяц рождения"]
       qhash["c[bday]"] = hash_qparams["День рождения"] if hash_qparams["День рождения"]
-
+      qhash["c[status]"] = [nil,"Не женат","Есть подруга","Помолвлен","Женат","Влюблён","Всё сложно","В активном поиске"].index(hash_qparams["Семейное положение"]) if hash_qparams["Семейное положение"]
 
       res = nil
       seconds_sleep = 50
@@ -2373,8 +2377,11 @@ module Vkontakte
     def post(message,connector=nil)
 
       connect = forсe_login(connector,@connect)
+      return unless @connect.able_to_post_on_wall
+
       if(connector)
         hash_current = hash_vk_for_user(connector)[0]
+        sleep @@post_interval
       else
         hash_current = hash_vk
       end
@@ -2402,12 +2409,17 @@ module Vkontakte
         end
         res = connect.post("/al_photos.php",hash)
         if(res.index("<div"))
-          break;
+          break
         else
           a = res.split("<!>")
           captcha_sid = a[a.length-2]
+          if(captcha_sid.to_i == 8)
+            connect.able_to_post_on_wall = false
+            progress :able_to_post_on_wall,connect
+            return
+          end
           break if captcha_sid.to_i < 100
-          captcha_key = @connect.ask_captcha_internal(captcha_sid)
+          captcha_key = connect.ask_captcha_internal(captcha_sid)
         end
       end
       connect.last_user_post = Time.new
