@@ -144,7 +144,7 @@ def ask_peoples
    "Семейное положение"=>{"Type" => "combo","Values" => ["Не важно", "Не женат","Есть подруга","Помолвлен","Женат","Влюблён","Всё сложно","В активном поиске"] },
 
    "Страница группы.\nНапример, так http://vk.com/evil_incorparate"=>"string"
-	 }, "name" => "Поиск"},
+	 }, "name" => "Поиск людей"},
 	 "tab1" => {"data" => "USERLIST", "name" => "Прошлые поиски"},
 	 "tab2" => {"data" => {"Список людей\nВведите id людей по одному в каждой строке" => "text"}, "name" => "Список"}}
 	)
@@ -185,6 +185,71 @@ def ask_peoples
 
 	end
 	res
+end
+
+
+class GroupRange
+
+  def initialize(min,max,connect)
+    @min = min
+    @max = max
+    @connect = connect
+  end
+  def each
+    (@min..@max).each do |group_id|
+      yield Group.new.set(group_id,nil, @connect)
+    end
+
+  end
+  def each_with_index
+    index = 0
+    (@min..@max).each do |group_id|
+      yield(Group.new.set(group_id,nil, @connect),index)
+      index += 1
+    end
+
+  end
+  def pop_next_group
+    return nil if @min>@max
+    @min += 1
+    return Group.new.set((@min - 1).to_s,nil, @connect)
+  end
+end
+
+def ask_groups
+
+  r = ask(
+      {"tab" => {"data"=>{"Критерий" => "string" ,
+                          "Страна" => {"Type" => "combo","Values" => ["Не важно"] + Vkontakte.countries.keys },
+                          "Город" => "string" ,
+                          "Тип сообщества"=>{"Type" => "combo","Values" => ["Не важно", "Группа","Страница","Встреча"] },
+                          "Количество результатов" => {"Type" => "int","Default" => 1000, "Minimum" => 1, "Maximum" => 1000 },
+                          "Начиная с..." => {"Type" => "int","Default" => 0, "Minimum" => 0, "Maximum" => 999 }
+
+      }, "name" => "Поиск групп"},
+       "tab1" => {"data" => {"От(id группы числом)" => {"Type" => "int","Default" => 20000, "Minimum" => 1, "Maximum" => 99999999 },"До(id группы числом)" => {"Type" => "int","Default" => 99999999, "Minimum" => 1, "Maximum" => 99999999 }}, "name" => "От и до"},
+       "tab2" => {"data" => {"Список групп\nВведите id групп по одному в каждой строке" => "text"}, "name" => "Список"}}
+  )
+
+  case(r.last)
+    when 0 then
+
+      q = { }
+
+
+      q["Страна"] = r[1] if r[1] != "Не важно"
+      q["Город"] = r[2] if r[2].length>0
+      q["Тип"] =  r[3] if r[3] != "Не важно"
+      "<img src = 'images/search.png'/>Поиск групп ...".print
+      res = Group.all(r[0],r[4],r[5],q).each
+    when 1 then
+      res = GroupRange.new(r[0],r[1],me.connect)
+    when 2 then
+
+      res = r[0].split("\n").map{|x| split = x.split(":"); Group.new.set(split[0].gsub(/\s/,""),split[1],me.connect)}.each
+
+  end
+  res
 end
 
 #Shortcut to ask
@@ -426,11 +491,13 @@ def flush
 end
 
 
-def sub(original,friend)
+def sub(original,friend = nil)
 	message_actual = original.dup
 	begin
-		message_actual.gsub!("$ИмяФамилия",friend.name||"")			
-		message_actual.gsub!("$Имя",friend.firstname||"")
+		if(friend)
+      message_actual.gsub!("$ИмяФамилия",friend.name||"")
+		  message_actual.gsub!("$Имя",friend.firstname||"")
+    end
 		message_actual.gsub!(/\{([^\}]+)\}/)do |match|
 			match.gsub("{","").gsub("}","").split("|").sample
 		end
@@ -442,6 +509,9 @@ end
 
 def aviable_text_features
 	"$Имя - имя пользователя\n$ИмяФамилия - Имя и фамилия пользователя\n{привет|здорово|хай} - теги"
+end
+def aviable_text_features_groups
+  "{привет|здорово|хай} - теги"
 end
 def check_users(&block)
 	Users.users(&block)

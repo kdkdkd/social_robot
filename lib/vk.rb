@@ -33,7 +33,7 @@ module Vkontakte
 
       return nil unless post_hash
 
-      return nil unless(@able_to_post)
+      return nil unless(able_to_post)
       sleep Vkontakte::post_interval
       while true
         hash = {"act" => "post","al" => "1", "facebook_export" => "", "friends_only" => "", "hash" => post_hash, "message" => msg, "note_title" => "", "official" => "" , "status_export" => "", "to_id" => id_to_post, "type" => "all" }
@@ -62,18 +62,24 @@ module Vkontakte
         res = @connect.post('/al_wall.php', hash)
         if(res.index("<!json>"))
           html_text = res.split("<!>").find{|x| x.index('"post_table"')}
-          return_value = Post.parse_html(Nokogiri::HTML(html_text.gsub("<!-- ->->","")),self,@connect)
+          return_value = Post.parse_html(Nokogiri::HTML(html_text.gsub("<!-- ->->","")),self,post_hash,"user",@connect)
           break
         else
           a = res.split("<!>")
           captcha_sid = a[a.length-2]
           if(captcha_sid == "8")
-			@connect.able_to_post_on_wall = false
-			progress :able_to_post_on_wall,@connect
-			return_value = nil
+			      @connect.able_to_post_on_wall = false
+			      progress :able_to_post_on_wall,@connect
+			      return_value = nil
             break
-		  end
-		  if captcha_sid.length != 12
+          end
+          if(captcha_sid == "11")
+            @connect.able_to_post_on_wall = false
+            progress :phone_to_post,@connect
+            return_value = nil
+            break
+          end
+		      if captcha_sid.length != 12
             return_value = nil
             break
           end
@@ -85,6 +91,50 @@ module Vkontakte
       progress :user_post,self,return_value if return_value
 
       return_value
+    end
+
+
+    def wall(size = 5)
+      return false unless @connect.login
+      progress "Reading wall #{@id}..."
+      return wall_offset(size) if size == "all"
+      res_all = []
+      index = 0
+      while true do
+        res = wall_offset(index.to_s)
+        index += res.length
+        break if res.length == 0 || res_all.length>=size.to_i
+        res_all += res
+      end
+      return res_all
+    end
+
+    def wall_offset(offset = 0)
+      if offset=="all"
+        res_all = []
+        index = 0
+        while true do
+          res = wall_offset(index.to_s)
+          index += res.length
+          break if res.length == 0
+          res_all += res
+        end
+        return res_all
+      end
+
+
+
+      #res_post = @connect.post("/wall#{id}",{"offset" => offset.to_s, "al" => "1","part"=>"1"})
+      res_post = @connect.post("/al_wall.php",{"act" => "get_wall","offset" => offset.to_s, "al" => "1","type"=>"all","owner_id"=>id_to_post})
+      html_text = res_post.split("<!>").find{|x| x.index('"post_table"')}
+      return [] unless html_text
+      html = Nokogiri::HTML(html_text.gsub("<!-- ->->",""))
+
+      res = []
+      html.xpath("//*[@class='post_table']").each do |table|
+        res.push Post.parse_html(table,self,((able_to_comment_post)? post_hash : nil),self.class.name,@connect)
+      end
+      res
     end
 
   end
@@ -316,7 +366,7 @@ module Vkontakte
       @able_to_send_message = true
       @able_to_invite_to_group = true
       @able_to_invite_friend = true
-	  @able_to_post_on_wall = true
+	    @able_to_post_on_wall = true
       @invite_box = {}
       new_agent
 
@@ -507,7 +557,11 @@ module Vkontakte
       else
         href = "/#{id}"
       end
+
       res = get(href)
+      if(type == "unknown" && User.get_id_by_feed(res) == "0")
+        res = get("/club#{id}")
+      end
       @last_user_fetch_date = Time.new
       res
     end
@@ -811,6 +865,58 @@ module Vkontakte
     def initialize()
       @open = "unknown"
       @type = "unknown"
+      @able_to_comment_post = "unknown"
+      @able_to_post = "unknown"
+    end
+
+    def able_to_post
+      return @able_to_post if @able_to_post != "unknown"
+      info
+      @able_to_post
+    end
+
+    def able_to_comment_post
+      return @able_to_comment_post if @able_to_comment_post != "unknown"
+      info
+      @able_to_comment_post
+    end
+
+
+    def Group.all(query = '', size = 50, offset = 0, hash_qparams = {},  connector=nil)
+      Search.all_general(query,size,offset,hash_qparams,connector,"groups") do |query,index,hash_qparams,connector|
+        Group.all_offset(query,index,hash_qparams,connector,false)
+      end
+    end
+
+    def Group.one(query = '', offset = 0, hash_qparams = {}, connector=nil)
+      Group.all_offset(query,offset,hash_qparams,connector)[0][0]
+    end
+
+
+    def Group.all_offset(query = '', offset = 0, hash_qparams = {}, connector=nil, force_all = false)
+      connect = forсe_login(connector)
+      return [[],false,0,nil] unless connect.login
+
+      qhash = {'al' => '1', 'c[q]' => query, 'c[section]' => 'communities', 'offset' => offset.to_s}
+      country_name = hash_qparams["Страна"]
+      country = @@countries[country_name]
+
+      qhash["c[country]"] = country if country
+      User.find_city(hash_qparams,connect)
+      city = hash_qparams["Ид города"]
+      qhash["c[city]"] = city if city && city != "unknown"
+
+      qhash["c[type]"] = [nil,"Группа","Страница","Встреча"].index(hash_qparams["Тип"]) if hash_qparams["Тип"]
+
+
+
+      Search.iterate_search(qhash,offset,connect,force_all) do |group|
+        a = group.xpath(".//a")[0]
+        href = a["href"].split("?").first
+        res =  Group.parse(href,false,connector)
+        res.name = a.text
+        res
+      end
     end
 
     #Public is "public". "group" means group or event
@@ -858,7 +964,9 @@ module Vkontakte
       @name
     end
 	
-	
+	  def name=(new_name)
+      @name = new_name
+    end
 
     def post_hash
       return @post_hash if @post_hash
@@ -887,11 +995,12 @@ module Vkontakte
     end
 
     def info(connector=nil)
+      return if @info
       connect = forсe_login(connector,@connect)
       progress "Fetching group info(#{@id})..."
 
       resp = connect.get_group(@id,@type)
-      @open = resp.index("Закрытая группа").nil?
+      @open = resp.index("Закрытая группа").nil? && resp.index("Closed community").nil?  && resp.index("Закрита група").nil?
       @type = (resp.index("group_id"))?"group":"public"
       begin
         @id = Group.get_id_by_group_page(resp, @type)
@@ -914,6 +1023,7 @@ module Vkontakte
       rescue
         @group_hash = nil
       end
+      @info = true
     end
 
     def group_hash
@@ -922,18 +1032,14 @@ module Vkontakte
       @group_hash
     end
 
-    def Group.id(some_id,connector=nil)
 
-      res = Group.parse("/public" + some_id.to_s,connector)
-      res.info
-      unless res.id
-        res = Group.parse("/club" + some_id.to_s,connector)
-        res.info
-      end
-      res
+
+    def Group.id(some_id,connector=nil)
+      connect = forсe_login(connector)
+      Group.new.set(some_id,nil,connect)
     end
 
-    def Group.parse(href,connector=nil)
+    def Group.parse(href,check_if_exist = true,connector=nil)
       connect = forсe_login(connector)
       res = nil
       if(href.index("/club"))
@@ -948,8 +1054,10 @@ module Vkontakte
       elsif
       id = href.split("/").last
         res = Group.new.set(id,nil,connect)
-        res.info
-        return nil if id.nil?
+        if(check_if_exist)
+          res.info
+          return nil if id.nil?
+        end
       end
       return res
     end
@@ -1168,6 +1276,8 @@ module Vkontakte
     def initialize
       @online = "unknown"
       @avatar = "unknown"
+      @able_to_comment_post = "unknown"
+      @able_to_post = "unknown"
     end
 
     def set(id,name=nil,connect=nil)
@@ -1249,10 +1359,16 @@ module Vkontakte
     end
 	
 	def able_to_post
-	  return @able_to_post if @able_to_post
+	  return @able_to_post if @able_to_post != "unknown"
       info
       @able_to_post
-	end
+  end
+
+    def able_to_comment_post
+      return @able_to_comment_post if @able_to_comment_post != "unknown"
+      info
+      @able_to_comment_post
+    end
 
     def info
       return @info if @info
@@ -1281,6 +1397,7 @@ module Vkontakte
       
       
       @able_to_post = !resp.index("wall.sendPost").nil?
+      @able_to_comment_post = !resp[/wall\.showEditReply\(\'\d+\_\d+\'\)/].nil?
       @post_hash = User.get_post_hash(resp)
       begin
         @avatar_string = html.xpath("//div[@id='profile_avatar']/a[@id='profile_photo_link']")[0]["href"]
@@ -1432,47 +1549,7 @@ module Vkontakte
     end
 
 
-    def wall(size = 50)
-      return false unless @connect.login
-      progress "Reading wall #{@id}..."
-      return wall_offset(size) if size == "all"
-      res_all = []
-      index = 0
-      while true do
-        res = wall_offset(index.to_s)
-        index += res.length
-        break if res.length == 0 || res_all.length>=size.to_i
-        res_all += res
-      end
-      return res_all
-    end
 
-    def wall_offset(offset = 0)
-      if offset=="all"
-        res_all = []
-        index = 0
-        while true do
-          res = wall_offset(index.to_s)
-          index += res.length
-          break if res.length == 0
-          res_all += res
-        end
-        return res_all
-      end
-
-
-
-      res_post = @connect.post("/wall#{id}",{"offset" => offset.to_s, "al" => "1","part"=>"1"})
-      html_text = res_post.split("<!>").find{|x| x.index('"post_table"')}
-      return [] unless html_text
-      html = Nokogiri::HTML(html_text.gsub("<!-- ->->",""))
-
-      res = []
-      html.xpath("//*[@class='post_table']").each do |table|
-        res.push Post.parse_html(table,self,@connect)
-      end
-      res
-    end
 
     def invite(message=nil,connector=nil)
       connect_old = @connect
@@ -1665,34 +1742,13 @@ module Vkontakte
       res_total
     end
 
+
+
+
     def User.all(query = '', size = 50, offset = 0, hash_qparams = {},  connector=nil)
-      User.find_city(hash_qparams,forсe_login(connector))
-      progress "Searching users #{query}..."
-      res_all = []
-      puts hash_qparams
-      index = offset
-      while true do
-
-        res = User.all_offset(query,index,hash_qparams,connector,false)
-        sleep 0.3
-        progress "Searching users #{query} offset #{index}..."
-        json_has_more = res[1]
-        json_offset = res[2]
-        json_length = res[3]
-        res = res[0]
-        #index += 20 if index==0
-        #index += 20
-        index = json_offset
-
-
-        res_all += res
-        if !json_has_more || res_all.length>=size.to_i
-          break
-        end
+      Search.all_general(query,size,offset,hash_qparams,connector,"users") do |query,index,hash_qparams,connector|
+        User.all_offset(query,index,hash_qparams,connector,false)
       end
-      res_all = res_all[0,size] if(res_all.length>size)
-
-      return res_all
     end
 
     def User.one(query = '', offset = 0, hash_qparams = {}, connector=nil)
@@ -1716,6 +1772,9 @@ module Vkontakte
         end
       end
     end
+
+
+
 
     def User.all_offset(query = '', offset = 0, hash_qparams = {}, connector=nil, force_all = false)
       connect = forсe_login(connector)
@@ -1749,47 +1808,12 @@ module Vkontakte
       qhash["c[bday]"] = hash_qparams["День рождения"] if hash_qparams["День рождения"]
       qhash["c[status]"] = [nil,"Не женат","Есть подруга","Помолвлен","Женат","Влюблён","Всё сложно","В активном поиске"].index(hash_qparams["Семейное положение"]) if hash_qparams["Семейное положение"]
 
-      res = nil
-      seconds_sleep = 50
-
-      while true
-        res = connect.post('/al_search.php',qhash)
-        json_valid = false
-        json_string = res.split("<!>").find{|x| x.index("<!json>")==0}
-
-        json = JSON.parse(json_string.gsub("<!json>",""))
-        json_has_more = json["has_more"]
-        json_offset = json["offset"]
-        json_length = nil
-        if(json["summary"])
-          json_length_string = json["summary"].gsub(/\<[^\>]+\>/,"").gsub(/[^\d]+/,'')
-          if (json_length_string.length != 0)
-            json_length = json_length_string.to_i
-            json_valid = true
-          end
-
-        end
-        res_array = []
-        if(offset>0 || json_valid || !force_all)
-          html_text = res.split("<!>").find{|x| x.index '<div'}
-          return [[],false,0,nil] unless html_text
-          html = Nokogiri::HTML(html_text)
-
-          html.xpath("//div[@class='info fl_l']").each do |human|
-            a = human.xpath(".//a")[0]
-            href = a["href"]
-            href = href.scan(/\/id(\d+)/)[0][0] if href =~ /\/id\d+/
-            href.gsub!("/","")
-            res_array.push(User.new.set(href,a.text,connect))
-          end
-        end
-        if(res_array.length > 0)
-          return [res_array,json_has_more,json_offset,json_length]
-        end
-        return  [[],false,0,nil] if(seconds_sleep>50)
-        progress "sleep #{seconds_sleep}"
-        sleep seconds_sleep
-        seconds_sleep *= 4
+      Search.iterate_search(qhash,offset,connect,force_all) do |human|
+        a = human.xpath(".//a")[0]
+        href = a["href"]
+        href = href.scan(/\/id(\d+)/)[0][0] if href =~ /\/id\d+/
+        href.gsub!("/","")
+        User.new.set(href,a.text,connect)
       end
     end
 
@@ -1869,21 +1893,68 @@ module Vkontakte
   end
 
   class Post
-    attr_accessor :id, :user, :text, :delete_hash, :like_hash, :connect
+    attr_accessor :id, :user_or_group, :text, :delete_hash, :like_hash, :post_hash, :type, :connect
 
-    def set(user,id,text,delete_hash,like_hash,connect)
+    def set(user_or_group,id,text,delete_hash,like_hash,post_hash,type,connect)
       @id = id
       @text = text
       @connect = connect
-      @user = user
+      @user_or_group = user_or_group
       @delete_hash = delete_hash
+      @post_hash = post_hash
       @like_hash = like_hash
+      @type = type
       self
     end
 
-    def Post.parse_html(table,user,connect)
+    def comment(message,connector = nil)
+      connect = forсe_login(connector,@connect)
+      return unless connect.login
+      return unless post_hash
+      return unless connect.able_to_post_on_wall
+      progress "Comment to post #{id} ..."
 
-      id_of_post = table.to_s.scan(Regexp.new("#{user.id}\\_(\\d+)"))[0][0]
+      if(connect.last_user_post)
+        diff = Time.new - @connect.last_user_post
+        sleep(@@post_interval - diff) if(diff<@@post_interval)
+      end
+
+      captcha_sid = nil
+      captcha_key = nil
+      while true
+        hash = {"act" => "post", "al" => "1","message"=>message,"hash"=>post_hash,"reply_to"=>"#{user_or_group.id_to_post}_#{id}","reply_to_msg"=>"","reply_to_user"=>"0","start_id"=>"","type"=>"all"}
+
+        unless(captcha_key.nil?)
+          hash["captcha_sid"] = captcha_sid
+          hash["captcha_key"] = captcha_key
+        end
+        res = connect.post("/al_wall.php",hash)
+        if(res[/\<\!\>\d{12}\<\!\>/])
+          a = res.split("<!>")
+          captcha_sid = a[a.length-2]
+
+          captcha_key = connect.ask_captcha_internal(captcha_sid)
+
+        elsif(res.split("<!>")[-2] == "11")
+          connect.able_to_post_on_wall = false
+          progress :phone_to_post,connect
+          return
+        elsif(res.split("<!>")[-2] == "8")
+          connect.able_to_post_on_wall = false
+          progress :able_to_post_on_wall,connect
+          return
+        else
+          break
+        end
+      end
+      connect.last_user_post = Time.new
+      progress :post_comment,user_or_group,message
+
+    end
+
+    def Post.parse_html(table,user_or_group,post_hash,type,connect)
+
+      id_of_post = table.to_s.scan(Regexp.new("#{user_or_group.id_to_post}\\_(\\d+)"))[0][0]
 
       delete_hash = table.to_s.scan(/wall\.deletePost[^\,]*\,\s*\'([^\']*)\'/)[0]
       delete_hash = (delete_hash)? delete_hash[0]:nil
@@ -1891,17 +1962,17 @@ module Vkontakte
       like_hash = table.to_s.scan(/wall\.like[^\,]*\,\s*\'([^\']*)\'/)[0]
       like_hash = (like_hash)? like_hash[0]:nil
 
-      text_of_post = table.xpath(".//div[@id='wpt#{user.id}_#{id_of_post}']")
+      text_of_post = table.xpath(".//div[@id='wpt#{user_or_group.id_to_post}_#{id_of_post}']")
       text_of_post = (text_of_post.length>0)? (text_of_post[0].text):nil
 
-      Post.new.set(user,id_of_post,text_of_post,delete_hash,like_hash,connect)
+      Post.new.set(user_or_group,id_of_post,text_of_post,delete_hash,like_hash,post_hash,type,connect)
 
     end
 
 
 
     def uniq_id
-      self.id + "_" + self.user.id
+      self.id + "_" + self.user_or_group.id
     end
 
     def ==(other_user)
@@ -1927,7 +1998,7 @@ module Vkontakte
       captcha_sid = nil
       captcha_key = nil
       while true
-        hash = {"act" => "a_do_like", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user.id}_#{id}","wall"=>"1"}
+        hash = {"act" => "a_do_like", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user_or_group.id_to_post}_#{id}","wall"=>"1"}
 
 
         unless(captcha_key.nil?)
@@ -1954,7 +2025,7 @@ module Vkontakte
       return false unless connect.login
       return false unless like_hash
       progress "Unlike post #{id} ..."
-      res_post = connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user.id}_#{id}","wall"=>"1"})
+      res_post = connect.post("/like.php",{"act" => "a_do_unlike", "al" => "1","from"=>"wall_page","hash"=>like_hash,"object"=>"wall#{user_or_group.id_to_post}_#{id}","wall"=>"1"})
       progress :post_unlike,self
     end
 
@@ -1962,7 +2033,7 @@ module Vkontakte
       return false unless @connect.login
       return false unless delete_hash
       progress "Delete post #{id} ..."
-      res_post = @connect.post("/al_wall.php",{"act" => "delete", "al" => "1","from"=>"wall","hash"=>delete_hash,"post"=>"#{user.id}_#{id}","root"=>"0"})
+      res_post = @connect.post("/al_wall.php",{"act" => "delete", "al" => "1","from"=>"wall","hash"=>delete_hash,"post"=>"#{user_or_group.id_to_post}_#{id}","root"=>"0"})
       progress :post_remove,self
     end
 
@@ -2527,7 +2598,84 @@ module Vkontakte
 
   end
 
+  class Search
 
+    def Search.all_general(query = '', size = 50, offset = 0, hash_qparams = {},  connector=nil, label = "users")
+      User.find_city(hash_qparams,forсe_login(connector))
+      progress "Searching #{label} #{query}..."
+      res_all = []
+      puts hash_qparams
+      index = offset
+      while true do
+
+        res = yield(query,index,hash_qparams,connector)
+        sleep 0.3
+        progress "Searching #{label} #{query} offset #{index}..."
+        json_has_more = res[1]
+        json_offset = res[2]
+        json_length = res[3]
+        res = res[0]
+        #index += 20 if index==0
+        #index += 20
+        index = json_offset
+
+
+        res_all += res
+        if !json_has_more || res_all.length>=size.to_i
+          break
+        end
+      end
+      res_all = res_all[0,size] if(res_all.length>size)
+
+      return res_all
+    end
+
+    #used as part(20 or 40) of search people or group
+    def Search.iterate_search(qhash,offset,connect,force_all)
+      res = nil
+      seconds_sleep = 50
+
+      while true
+        res = connect.post('/al_search.php',qhash)
+        json_valid = false
+        json_string = res.split("<!>").find{|x| x.index("<!json>")==0}
+
+        json = JSON.parse(json_string.gsub("<!json>",""))
+        json_has_more = json["has_more"]
+        json_offset = json["offset"]
+        json_length = nil
+        if(json["summary"])
+          json_length_string = json["summary"].gsub(/\<[^\>]+\>/,"").gsub(/[^\d]+/,'')
+          if (json_length_string.length != 0)
+            json_length = json_length_string.to_i
+            json_valid = true
+          end
+
+        end
+        res_array = []
+        if(offset>0 || json_valid || !force_all)
+          html_text = res.split("<!>").find{|x| x.index '<div'}
+          return [[],false,0,nil] unless html_text
+          html = Nokogiri::HTML(html_text)
+
+          html.xpath("//div[@class='info fl_l']").each do |human|
+            res_yield = yield(human)
+
+            res_array.push(res_yield) if res_yield
+
+          end
+        end
+        if(res_array.length > 0)
+          return [res_array,json_has_more,json_offset,json_length]
+        end
+        return  [[],false,0,nil] if(seconds_sleep>50)
+        progress "sleep #{seconds_sleep}"
+        sleep seconds_sleep
+        seconds_sleep *= 4
+      end
+    end
+
+  end
 
 
 end

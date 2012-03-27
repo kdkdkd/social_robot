@@ -20,6 +20,7 @@
 	 when :post_like then res = "Поставлен лайк к #{args[1].pretty_string}"
 	 when :post_unlike then res = "Убран лайк к #{args[1].pretty_string}"
    when :post_remove then res = "#{args[1].pretty_string} - Удалено"
+   when :post_comment then res = "Оставлен коммент #{args[2]} на стене #{args[1].pretty_string}"
 
    when :mail_remove then res = "#{args[1].pretty_string} - Удалено"
 	 
@@ -53,6 +54,7 @@
 
 
      when :phone_invite_to_group then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} не может пригласить в группу из-за того, что телефон не привязан"
+     when :phone_to_post then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} не может оставить запись из-за того, что телефон не привязан"
 
      when :search_divide_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов. разбиваю..."
      when :search_fit_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов."
