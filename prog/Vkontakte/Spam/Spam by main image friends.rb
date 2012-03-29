@@ -6,6 +6,9 @@ friends = me.friends
 
 #Найти людей
 friends.each_with_index do |people,index| 
+
+     #В случае лимита - останавливаемся
+     break unless me.connect.able_to_post_on_wall
      
      #Игнорируем ошибки	
      safe{

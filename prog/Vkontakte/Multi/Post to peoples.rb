@@ -49,7 +49,7 @@ check_users do |user_out|
 				end
 				#Или в комментариях
 				if(send_method_index == 2 || send_method_index == 0 && !post)
-					safe{w = target.wall(1)[0]; w.comment(message_actual) if w}
+					safe{w = target.wall(1,user)[0]; w.comment(message_actual,user) if w}
 				end
 				
 				

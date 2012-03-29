@@ -4,7 +4,10 @@ message = ask_text("Сообщение.\n#{aviable_text_features}")
 peoples = ask_peoples
 
 #Найти людей
-peoples.each_with_index do |people,index| 
+peoples.each_with_index do |people,index|
+
+     #В случае лимита - останавливаемся
+     break unless me.connect.able_to_post_on_wall 
      
      #Игнорируем ошибки	
      safe{

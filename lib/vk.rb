@@ -94,14 +94,13 @@ module Vkontakte
     end
 
 
-    def wall(size = 5)
-      return false unless @connect.login
+    def wall(size = 5,connector = nil)
       progress "Reading wall #{@id}..."
       return wall_offset(size) if size == "all"
       res_all = []
       index = 0
       while true do
-        res = wall_offset(index.to_s)
+        res = wall_offset(index.to_s,connector)
         index += res.length
         break if res.length == 0 || res_all.length>=size.to_i
         res_all += res
@@ -109,7 +108,8 @@ module Vkontakte
       return res_all
     end
 
-    def wall_offset(offset = 0)
+    def wall_offset(offset = 0,connector = nil)
+	  connect = forсe_login(connector,@connect)
       if offset=="all"
         res_all = []
         index = 0
@@ -124,15 +124,15 @@ module Vkontakte
 
 
 
-      #res_post = @connect.post("/wall#{id}",{"offset" => offset.to_s, "al" => "1","part"=>"1"})
-      res_post = @connect.post("/al_wall.php",{"act" => "get_wall","offset" => offset.to_s, "al" => "1","type"=>"all","owner_id"=>id_to_post})
+      
+      res_post = connect.post("/al_wall.php",{"act" => "get_wall","offset" => offset.to_s, "al" => "1","type"=>"all","owner_id"=>id_to_post})
       html_text = res_post.split("<!>").find{|x| x.index('"post_table"')}
       return [] unless html_text
       html = Nokogiri::HTML(html_text.gsub("<!-- ->->",""))
 
       res = []
       html.xpath("//*[@class='post_table']").each do |table|
-        res.push Post.parse_html(table,self,((able_to_comment_post)? post_hash : nil),self.class.name,@connect)
+        res.push Post.parse_html(table,self,((able_to_comment_post)? post_hash : nil),self.class.name,connect)
       end
       res
     end
@@ -346,7 +346,7 @@ module Vkontakte
 
   class Connect
     attr_reader :uid
-    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message, :able_to_invite_to_group, :able_to_invite_friend, :invite_box, :able_to_post_on_wall, :able_to_like
+    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message, :able_to_invite_to_group, :able_to_invite_friend, :invite_box, :able_to_post_on_wall, :able_to_like, :able_to_post_on_custom_photo
 
 
     def cookie
@@ -367,6 +367,7 @@ module Vkontakte
       @able_to_invite_to_group = true
       @able_to_invite_friend = true
 	    @able_to_post_on_wall = true
+      @able_to_post_on_custom_photo = true
       @invite_box = {}
       new_agent
 
@@ -867,6 +868,7 @@ module Vkontakte
       @type = "unknown"
       @able_to_comment_post = "unknown"
       @able_to_post = "unknown"
+      @info = false
     end
 
     def able_to_post
@@ -1007,10 +1009,12 @@ module Vkontakte
         @name = Nokogiri::HTML(resp).xpath("//title").text unless @name
       rescue
         @id = nil
+        @info = true
         return
       end
 
       @able_to_post = !resp.index("wall.sendPost").nil?
+      @able_to_comment_post = !resp[/wall\.showEditReply\(\'\-\d+\_\d+\'\)/].nil?
       @post_hash = User.get_post_hash(resp)
       begin
 
@@ -1907,8 +1911,8 @@ module Vkontakte
       self
     end
 
-    def comment(message,connector = nil)
-      connect = forсe_login(connector,@connect)
+    def comment(message)
+      connect = @connect
       return unless connect.login
       return unless post_hash
       return unless connect.able_to_post_on_wall
@@ -2095,6 +2099,12 @@ module Vkontakte
       res_album = Album.new.set(User.new.set(connect.uid), album_id ,name,nil,connect)
       progress :album_created, res_album
       res_album
+    end
+
+
+    def main_album?
+
+      id == "0" || id == "00"
     end
 
 
@@ -2445,10 +2455,14 @@ module Vkontakte
       progress :image_like,self
     end
 
+
+
+
+
     def post(message,connector=nil)
 
       connect = forсe_login(connector,@connect)
-      return unless @connect.able_to_post_on_wall
+      return if !@connect.able_to_post_on_wall && album.main_album? || !@connect.able_to_post_on_custom_photo && !album.main_album?
 
       if(connector)
         hash_current = hash_vk_for_user(connector)[0]
@@ -2485,11 +2499,17 @@ module Vkontakte
           a = res.split("<!>")
           captcha_sid = a[a.length-2]
           if(captcha_sid.to_i == 8)
-            connect.able_to_post_on_wall = false
-            progress :able_to_post_on_wall,connect
+            if(album.main_album?)
+              connect.able_to_post_on_wall = false
+              progress :able_to_post_on_wall,connect
+            else
+              connect.able_to_post_on_custom_photo = false
+              progress :able_to_post_on_custom_photo,connect
+            end
+
             return
           end
-          break if captcha_sid.to_i < 100
+          break if captcha_sid.length != 12
           captcha_key = connect.ask_captcha_internal(captcha_sid)
         end
       end

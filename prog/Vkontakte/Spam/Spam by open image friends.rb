@@ -5,7 +5,10 @@ friends = me.friends
 
 
 #Найти людей
-friends.each_with_index do |people,index| 
+friends.each_with_index do |people,index|
+
+     #В случае лимита - останавливаемся
+     break if !me.connect.able_to_post_on_wall && !me.connect.able_to_post_on_custom_photo
 
      #Копируем сообщение
      message_actual = sub(message,people)
@@ -18,6 +21,10 @@ friends.each_with_index do |people,index|
      
           #Для каждого альбома
           people.albums.each do |album|
+
+	#Пропускаем альбом, если не можем комментировать
+	next if album.main_album? && !me.connect.able_to_post_on_wall || !album.main_album? && !me.connect.able_to_post_on_custom_photo
+
 
                #Находим фотографии в альбоме
                photos = album.photos
