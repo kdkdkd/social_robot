@@ -209,8 +209,8 @@ class GroupRange
     end
 
   end
-  def pop_next_group
-    return nil if @min>@max
+  def next
+	return nil if @min>@max
     @min += 1
     return Group.new.set((@min - 1).to_s,nil, @connect)
   end

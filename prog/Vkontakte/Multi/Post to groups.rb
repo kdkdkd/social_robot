@@ -33,7 +33,12 @@ check_users do |user_out|
 				target = nil
 				
 				#Кому слать
-				mutex.synchronize{target = groups.pop_next_group}
+				mutex.synchronize do 
+					begin
+						target = groups.next
+					rescue
+					end
+				end
 				
 				unless target
 					user_continue = "STOP"
@@ -50,7 +55,7 @@ check_users do |user_out|
 				end
 				#Или в комментариях
 				if(send_method_index == 2 || send_method_index == 0 && !post)
-					safe{w = target.wall(1,user)[0]; w.comment(message_actual,user) if w}
+					safe{w = target.wall(1,user)[0]; w.comment(message_actual) if w}
 				end
 				
 				

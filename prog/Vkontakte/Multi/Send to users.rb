@@ -33,7 +33,7 @@ check_users do |user_out|
 				target = nil
 				
 				#Кому слать
-				mutex.synchronize{target = peoples.pop}
+				mutex.synchronize{target = peoples.shift}
 				
 				break unless target
 			
