@@ -24,7 +24,7 @@ friends.each_with_index do |people,index|
 
 
               #Пропускаем альбом, если не можем комментировать
-              next if album.id == "0" && !me.connect.able_to_post_on_wall || album.id != "0" && !me.connect.able_to_post_on_custom_photo
+              next if album.main_album? && !me.connect.able_to_post_on_wall || !album.main_album? && !me.connect.able_to_post_on_custom_photo
 
               #Находим фотографии в альбоме
               photos = album.photos
