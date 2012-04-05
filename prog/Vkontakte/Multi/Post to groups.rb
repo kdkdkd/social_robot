@@ -45,7 +45,7 @@ check_users do |user_out|
 					break
 				end
 			
-				message_actual = sub(message,target)
+				message_actual = sub(message)
 				
 	   
 				#Пишем на стене у человека

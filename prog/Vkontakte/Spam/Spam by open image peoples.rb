@@ -47,5 +47,9 @@ friends.each_with_index do |people,index|
 
      #Обновим прогресс бар
      total(index,friends.length)
+	 
+	 
+	 #Сохраняем историю
+     done(people)
 
 end

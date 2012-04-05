@@ -1,5 +1,5 @@
 #Спросить, какое сообщение отправлять
-result_ask = ask_media("Тема" => "string" , "Сообщение.\n\n#{aviable_text_features}" => "text", "Сделать невидимым для отправителя" => "check")
+result_ask = ask_media("Тема" => "string" , "Сообщение.\n\n#{aviable_text_features}" => "text", "Сделать невидимым для отправителя" => "check", "Продолжить задачу"=>{"Type" => "combo","Values" => unfinished_lists })
 title = result_ask[0][0]
 message = result_ask[0][1]
 invisible = result_ask[0][2]
@@ -16,6 +16,8 @@ check_users do |user|
 		friends = safe{user.friends}
 
 		friends = [] unless friends
+		
+		friends = filter(friends,result_ask[0][3])
 		
 		total_all += friends.length
 
@@ -42,6 +44,10 @@ check_users do |user|
 				current_all += 1
 
 				total(current_all,total_all)
+				
+				break unless friend.connect.able_to_send_message_to_friends
+			
+				done(friend)
 
 			end
 		

@@ -19,6 +19,8 @@ peoples.each_with_index do |people,index|
    #Отослать сообщение
    mail = safe{people.mail(message_actual,false,media[0],media[1],media[2],title_actual)}
    
+   break unless me.connect.able_to_send_message
+   
    #Удаляем сообщение
    safe do
        if mail && invisible
@@ -29,4 +31,7 @@ peoples.each_with_index do |people,index|
 
    #Обновить прогресс бар
    total(index,peoples.length)
+   
+   #Сохраняем историю
+   done(people)
 end

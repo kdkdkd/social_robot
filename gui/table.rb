@@ -58,20 +58,51 @@ class UserTable < Qt::Widget
   end
 
   def res
-    @edit.plainText.force_encoding("UTF-8").split("\n")
+    r = @edit.plainText.force_encoding("UTF-8").split("\n")
+    return {"data" => r} unless @list.currentItem
+    item_data = @list.currentItem.data(32).toString
+    if(item_data && item_data.length>0)
+      return {"data" => r, "history_list_id" => item_data}
+    else
+      return {"data" => r, "list_id" => $db[:list][:name=>@list.currentItem.text][:id]}
+    end
   end
 
   def save_task_id
-    if @last_selected_id && @last_selected_changed
-      $db[:user].filter(:list_id=>@last_selected_id).delete
-			import = []
-			@edit.plainText.each_line do |line|
-        line.gsub!("\r","")
-        line.gsub!("\n","")
-				split = line.split(":")
-				import.push([split[0],split[1] || "",@last_selected_id])
-			end
-			$db[:user].import([:id,:name,:list_id], import)
+    if @last_selected_changed
+      if(@last_selected_list_id || @last_selected_history_id)
+        import = []
+        @edit.plainText.each_line do |line|
+          line.gsub!("\r","")
+          line.gsub!("\n","")
+          split = line.split(":")
+          import.push([split[0],split[1] || ""])
+        end
+      end
+      if(@last_selected_list_id)
+        $db[:user].filter(:list_id=>@last_selected_list_id).delete
+
+        $db[:user].import([:id,:name,:list_id], import.map{|a|a.push(@last_selected_list_id);a})
+      elsif(@last_selected_history_id)
+        #Remove old history
+        $db[:history_item].filter(:history_list_id=>@last_selected_history_id).delete
+
+        #Take existing list id or create new one
+        list_id = $db[:history_list][:id=>@last_selected_history_id][:list_id]
+        list_id = $db[:list].filter[:visible=>0,:id=>list_id]
+        if (list_id)
+          list_id = list_id[:id]
+          $db[:user].filter(:list_id=>list_id).delete
+        else
+          list_id = $db[:list].insert(:name=>"invisible",:visible=>0)
+          $db[:history_list].filter(:id=>@last_selected_history_id).update(:list_id => list_id)
+        end
+
+        $db[:user].import([:id,:name,:list_id], import.map{|a|a.push(list_id);a})
+
+
+
+      end
     end
   end
 
@@ -89,18 +120,33 @@ class UserTable < Qt::Widget
       @delete_all_lists = false
     end
     @edit.setStyleSheet("QTextEdit{background-color: white;}")
-    list_id = $db[:list][:name=>@list.currentItem.text][:id]
+    item_data = @list.currentItem.data(32).toString
+    is_history_selected_or_list = item_data && item_data.length>0
+    if(is_history_selected_or_list)
+      list_id = $db[:history_list][:id=>item_data][:list_id]
+      q = "list_id = #{list_id} and id not in (SELECT object_id FROM history_item where history_list_id = #{item_data})"
+    else
+      list_id = $db[:list][:name=>@list.currentItem.text][:id]
+      q = "list_id = #{list_id}"
+    end
+
     save_task_id
-    @last_selected_id = list_id
+    if(is_history_selected_or_list)
+      @last_selected_history_id = item_data
+      @last_selected_list_id = nil
+    else
+      @last_selected_list_id = list_id
+      @last_selected_history_id = nil
+    end
 
 
 
     @edit.readOnly = false
     all = ""
     count = 0
-		$db[:user].filter(:list_id=>list_id).each do |u|
+		$db[:user].filter(q).each do |u|
       add_string = u[:id].to_s
-      add_string += ":#{u[:name]}" if(u[:name].length>0)
+      add_string += ":#{u[:name]}" if(u[:name] && u[:name].length>0)
       all += "#{add_string}\n"
       count += 1
     end
@@ -112,7 +158,7 @@ class UserTable < Qt::Widget
   def delete_clicked
     if @delete_all_lists
 
-      if(@list.count>0)
+      #if(@list.count>0)
 
         msgBox = Qt::MessageBox.new
         msgBox.setText("Удалить все списки.")
@@ -124,9 +170,11 @@ class UserTable < Qt::Widget
         if(res)
           $db[:list].delete
           $db[:user].delete
+          $db[:history_list].delete
+          $db[:history_item].delete
           @list.clear()
         end
-      end
+      #end
 
     else
       if @list.currentItem.nil?
@@ -134,8 +182,31 @@ class UserTable < Qt::Widget
         @delete.text = "Удалить все списки людей"
         @delete_all_lists = true
        return
-     end
-      $db[:list].filter(:name=>@list.currentItem.text).delete
+      end
+      item_data = @list.currentItem.data(32).toString
+      if(item_data && item_data.length>0)
+
+        list_id = $db[:history_list][:id=>item_data][:list_id]
+        list_id = $db[:list].filter[:visible=>0,:id=>list_id]
+        if(list_id)
+          list_id = list_id[:id]
+          $db[:list].filter(:visible=>0,:id=>list_id).delete
+          $db[:user].filter(:list_id=>list_id).delete
+        end
+
+        $db[:history_list].filter(:id=>item_data).delete
+        $db[:history_item].filter(:history_list_id=>item_data).delete
+      else
+        list_id = $db[:list][:name=>@list.currentItem.text][:id]
+        if($db[:history_list].filter(:list_id=>list_id).count == 0)
+          $db[:user].filter(:list_id=>list_id).delete
+          $db[:list].filter(:name=>@list.currentItem.text).delete
+        else
+          $db[:list].filter(:name=>@list.currentItem.text).update(:visible=>0)
+        end
+
+      end
+
      @list.takeItem(@list.currentRow)
   end
 
@@ -155,7 +226,8 @@ class UserTable < Qt::Widget
 
   def initialize
     super
-    @last_selected_id = nil
+    @last_selected_list_id = nil
+    @last_selected_history_id = nil
     @last_selected_changed = nil
     layout = Qt::HBoxLayout.new
     right_widget = Qt::Widget.new
@@ -195,12 +267,18 @@ class UserTable < Qt::Widget
     list_and_commands_layout.addWidget(@delete)
     layout.addWidget(list_and_commands)
     layout.addWidget(right_widget)
-    $db[:list].each do |list|
+    $db[:history_list].filter("list_id > 0").each do |list|
+      newItem = Qt::ListWidgetItem.new
+      newItem.setIcon(Qt::Icon.new("images/list.png"))
+      newItem.setText("Продолжить задачу\n#{list[:name]}\nОт #{list[:date]}")
+      newItem.setData(32,Qt::Variant.new(list[:id]))
+      @list.insertItem(0, newItem)
+    end
+    $db[:list].filter(:visible=>1).each do |list|
       newItem = Qt::ListWidgetItem.new
       newItem.setIcon(Qt::Icon.new("images/list.png"))
       newItem.setText(list[:name])
       @list.insertItem(0, newItem)
-
     end
   end
 

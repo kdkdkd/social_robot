@@ -5,7 +5,7 @@ Sequel::Model.plugin :force_encoding, 'UTF-8'
 
 class RobotDatabase
 
-	@@maximum_migration = 6
+	@@maximum_migration = 7
 	
 	def initialize(database_name)
 		@db = Sequel.connect(:adapter=>'sqlite', :database =>database_name, :timeout=>99999999)
@@ -75,6 +75,7 @@ class RobotDatabase
           Integer :task_id
           String :error, :text=>true
         end
+
         when 6 then
 				@db.create_table(:list) do
 					primary_key :id
@@ -84,10 +85,26 @@ class RobotDatabase
           String :id
 					String :name
           Integer :list_id
-				end
-    end
+        end
 
-	
+      when 7 then
+        @db.create_table(:history_list) do
+          primary_key :id
+          String :name, :text=>true
+          String :date
+          Integer :list_id
+        end
+        @db.create_table(:history_item) do
+          primary_key :id
+          String :object_id
+          Integer :history_list_id
+        end
+        @db.alter_table(:list) do
+          add_column :visible, Integer, :default=>1
+        end
+
+
+	    end
 	end
 
 end

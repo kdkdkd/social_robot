@@ -1,7 +1,8 @@
-message = ask_text("Сообщение.\n#{aviable_text_features}")
+res = ask("Сообщение.\n#{aviable_text_features}" => "string", "Продолжить задачу"=>{"Type" => "combo","Values" => unfinished_lists })
+message = res[0]
 
 #Найти друзей
-friends = me.friends
+friends = filter(me.friends,res[1])
 
 
 #Найти людей
@@ -15,15 +16,15 @@ friends.each_with_index do |people,index|
 
      #Находим фото, открытое для комментирования
      open_photo = nil
-     
+	 
      #Избегаем ошибок
      safe{
      
           #Для каждого альбома
           people.albums.each do |album|
 
-	#Пропускаем альбом, если не можем комментировать
-	next if album.main_album? && !me.connect.able_to_post_on_wall || !album.main_album? && !me.connect.able_to_post_on_custom_photo
+	           #Пропускаем альбом, если не можем комментировать
+	           next if album.main_album? && !me.connect.able_to_post_on_wall || !album.main_album? && !me.connect.able_to_post_on_custom_photo
 
 
                #Находим фотографии в альбоме
@@ -47,5 +48,8 @@ friends.each_with_index do |people,index|
      }
      #Обновим прогресс бар
      total(index,friends.length)
+	 
+	 #Сохраняем историю
+     done(people)
 
 end

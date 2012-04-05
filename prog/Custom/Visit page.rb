@@ -2,7 +2,7 @@
 ar = $db[:proxy].to_a
 
 
-res = ask("адрес каритнки" => "string", "реферер" => "string")
+res = ask("адрес картинки" => "string", "реферер" => "string")
 
 
 agents = ['Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.10.229 Version/11.61'] + (Mechanize::AGENT_ALIASES.keys - ['Mechanize']).map{|x| Mechanize::AGENT_ALIASES[x].dup}

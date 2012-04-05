@@ -26,6 +26,11 @@ peoples.each_with_index do |people,index|
 	safe{w = people.wall(1)[0]; w.comment(message_actual) if w}
    end
    
+   break unless me.connect.able_to_post_on_wall
+   
    #Обновляем прогресс бар
    total(index,peoples.length)
+   
+   #Сохраняем историю
+   done(people)
 end

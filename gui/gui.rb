@@ -2,8 +2,34 @@
 
 require 'Qt'
 
+$app = Qt::Application.new(ARGV)
+
+if(!File.exist?(File.join(File.expand_path("../.."),"ruby", "bin", "imageformats", "qjpeg4.dll")))
+
+	#Ask user to download new version
+	
+	widget = Qt::MainWindow.new
+	
+	label = Qt::Label.new
+	label.setOpenExternalLinks(true)
+	widget.setWindowTitle("Обновление")
+	widget.resize(400, 250)
+	label.text = "В новой версии социального робота встроен браузер, <br>и обновлена версия руби, поэтому программу необходимо перекачать. <br><br> <a href='https://github.com/downloads/kdkdkd/social_robot/socialrobot.exe'>https://github.com/downloads/kdkdkd/social_robot/socialrobot.exe</a>"
+	label.setAlignment(Qt::AlignCenter)
+	widget.setCentralWidget(label)
+	widget.setWindowIcon(Qt::Icon.new("images/logo.png"))
+
+	widget.show
+	widget.raise
+	$app.exec
+	exit
+end
+
+
+require './multibrowser.rb'
 require './highlighter_ruby.rb'
 require 'pathname'
+
 
 require './help.rb'
 require './settings.rb'
@@ -22,7 +48,7 @@ require 'json'
 
 $db = nil
 
-$app = Qt::Application.new(ARGV)
+
 
 $client = nil
 
@@ -30,7 +56,7 @@ $shared = File.expand_path("../../shared")
 
 
 class SocialRobot < Qt::MainWindow
-	slots   'search_peoples()','database_lists()', 'read()','delete_button_click()','stop_button_click()', 'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
+	slots   'multibrowser()', 'search_peoples()','database_lists()', 'read()','delete_button_click()','stop_button_click()', 'database_peoples()','database_proxy()','enter_system()','link_clicked( const QUrl & )','toggle_developer_mode()', 'open_settings()','open_files_clicked()','open_file_clicked()', 'menu_script_click()','code_changed()','run_script()','create_script()','save_script()','open_script()','insert_help(QTreeWidgetItem *, int)', 'show_loot()'
 
 
 	def read
@@ -322,6 +348,10 @@ class SocialRobot < Qt::MainWindow
 		@enter_action = Qt::Action.new(Qt::Icon.new("images/vkontakte.png"),"Вход в систему", self)
 		@enter_action.statusTip = "Вход в систему"
 		connect(@enter_action, SIGNAL('triggered()'), self, SLOT('enter_system()'))
+		
+		@multiborowser_action = Qt::Action.new(Qt::Icon.new("images/safari.png"),"Мультибраузер", self)
+		@multiborowser_action.statusTip = "Мультибраузер"
+		connect(@multiborowser_action, SIGNAL('triggered()'), self, SLOT('multibrowser()'))
 
 		@database_peoples = Qt::Action.new(Qt::Icon.new("images/user.png"),"Аккаунты", self)
 		@database_peoples.statusTip = "Редактировать аккаунты"
@@ -378,6 +408,8 @@ class SocialRobot < Qt::MainWindow
 		@run_toolbar = addToolBar("Run")
 		@run_toolbar.addAction(@run_action)
 		@run_toolbar.addAction(@enter_action)
+		@run_toolbar.addAction(@multiborowser_action)
+		
 
 
 		statusBar().showMessage("")
@@ -410,14 +442,15 @@ class SocialRobot < Qt::MainWindow
 		@log_edit.append("<font color='black' size='3'>Чтобы начать работу, выберите один из пунктов меню. Например, <i>Музыка -> Cкачать мою музыку</i><br/><br/>Или нажмите на кнопку <img src=\"images/vkontakte.png\"/> Это покажет Вас и Ваших друзей и абсолютно безобидно.<br/><br/><br/>Подробнее об использовании и возможностях программы на <a href=\"http://socialrobot.net\">http://socialrobot.net</a><br><br><br>Список изменений <a href=\"https://twitter.com/#!/socialrobot_net\">https://twitter.com/#!/socialrobot_net</a></font>")
 		
 		update_developer_mode()
-		
-
-
-
-       
-        
         
         @memory_input = {}
+		@browsers = []
+  end
+  
+  def multibrowser
+	new_browser = MultiBrowser.new
+	@browsers.push(new_browser)
+	new_browser.show()
   end
 
   def database_lists
@@ -865,7 +898,7 @@ class SocialRobot < Qt::MainWindow
           param_label = nil
           if param =~ /^IMAGE/
               param_copy = param.gsub(/^IMAGE/,"")
-            pixmap = Qt::Pixmap.new("../../loot/captcha/#{param_copy}.png")
+            pixmap = Qt::Pixmap.new("../../loot/captcha/#{param_copy}.jpg")
             label = Qt::Label.new;
             label.setPixmap(pixmap);
 
@@ -885,8 +918,22 @@ class SocialRobot < Qt::MainWindow
               input = Qt::ComboBox.new
 
               selected_item_index = -1
-              value_hash["Values"].each_with_index{|x,i|input.insertItem(i,x.to_s);selected_item_index = i if x.to_s == default.to_s}
+              max_lines = 1
+              value_hash["Values"].each_with_index do |a,i|
+                if(a.class.name =~ /Hash/)
+                  x = a["caption"]
+                  input.insertItem(i,x.to_s,Qt::Variant.new(a["data"]))
+                else
+                  x = a
+                  input.insertItem(i,x.to_s)
+                end
+
+                l = x.to_s.lines.to_a.length
+                max_lines = l if l>max_lines
+                selected_item_index = i if x.to_s == default.to_s
+              end
               input.setCurrentIndex(selected_item_index) if selected_item_index>=0
+              input.setStyleSheet("QComboBox{height:#{max_lines*14}px;}")
               controls.push(input)
               layout.addWidget(input,index,1)
             elsif value_hash["Type"] == "int"
@@ -1014,10 +1061,17 @@ class SocialRobot < Qt::MainWindow
           text = @controls_hash[control].text
           text.force_encoding("UTF-8")
           res.push(text.split("|"))
-        when /ComboBox/
-          text = control.currentText
-          text.force_encoding("UTF-8")
-          res.push(text)
+          when /ComboBox/
+          control_data = control.itemData(control.currentIndex)
+          if(control_data.isValid)
+            res.push(control_data.toString)
+          else
+            text = control.currentText
+            text.force_encoding("UTF-8")
+            res.push(text)
+          end
+
+
         when /CheckBox/
           res.push(control.checked)
         when /UserTable/
@@ -1058,53 +1112,54 @@ class SocialRobot < Qt::MainWindow
 end
 
 
-new_version = nil
-begin
-	new_version = Updater.new.update
-rescue
-		
-end
-
-unless(new_version)
-
+	new_version = nil
 	begin
-	
-		data = RobotDatabase.new(File.join(File.expand_path("../.."),"data/data.db"))
-		data.update()
-		$db = data.db
-		
-	#rescue
-		
+		new_version = Updater.new.update
+	rescue
+			
 	end
 
-	widget = SocialRobot.new
+	unless(new_version)
 
-	widget.show
-	widget.raise
-
-
-
-    splash = "../../splash/pid.txt"
-	if File.exist?(splash)
 		begin
-			Process.kill "KILL", IO.read(splash).to_i
-		rescue
+		
+			data = RobotDatabase.new(File.join(File.expand_path("../.."),"data/data.db"))
+			data.update()
+			$db = data.db
+			
+		#rescue
+			
 		end
-		File.delete(splash)
-	end
-	
-	
-	
-	
-	
-	$app.exec
-else
-    Dir.chdir File.join(File.expand_path("../.."),"#{new_version}/gui/")
-	
-	system_command = "\"#{File.join(File.expand_path("../.."),"ruby/bin/rubyw.exe")}\" -r \"#{File.join(File.expand_path("../.."),"#{new_version}/gui/gui.rb")}\""
-	
-	system(system_command)
 
-end
+		widget = SocialRobot.new
+
+		widget.show
+		widget.raise
+
+
+
+		splash = "../../splash/pid.txt"
+		if File.exist?(splash)
+			begin
+				Process.kill "KILL", IO.read(splash).to_i
+			rescue
+			end
+			File.delete(splash)
+		end
+		
+		
+		
+		
+		
+		$app.exec
+	else
+		Dir.chdir File.join(File.expand_path("../.."),"#{new_version}/gui/")
+		
+		system_command = "\"#{File.join(File.expand_path("../.."),"ruby/bin/rubyw.exe")}\" -r \"#{File.join(File.expand_path("../.."),"#{new_version}/gui/gui.rb")}\""
+		
+		system(system_command)
+
+	end
+
 
 

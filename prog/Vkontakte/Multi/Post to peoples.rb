@@ -57,6 +57,8 @@ check_users do |user_out|
 				current += 1
 
 				total(current,total_length)
+				
+				done(target)
 
 				break unless user.connect.able_to_post_on_wall
 			end

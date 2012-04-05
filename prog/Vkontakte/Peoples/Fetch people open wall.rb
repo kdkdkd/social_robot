@@ -8,13 +8,19 @@ peoples.each_with_index do |user,i|
     safe do
          
          #Продолжать если нельзя постить
-         next unless user.able_to_post
+         if user.able_to_post
 
-         #Вывести id
-         user.id.print
-    
+             #Вывести id
+             user.id.print
+			 
+		 end
+		 
+		 
          #Update progress bar
          total(i,peoples.length)
+		 
+		 #Сохраняем историю
+         done(user)
     end
 end
 

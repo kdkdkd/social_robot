@@ -7,17 +7,17 @@ peoples.each_with_index do |user,i|
     #Продолжать при оибках
     safe do
 
-        #Получить информацию о человеке
-        skype = user.info["ICQ"]
-
-        #Продолжать если не указан Skype
-        next if skype.nil?
+       #Получить информацию о человеке
+       skype = user.info["ICQ"]
 
        #Вывести skype
-       {skype => user}.print if(skype.length>=10)
+       {skype => user}.print if(!skype.nil? && skype.length>=10)
     
        #Update progress bar
        total(i,peoples.length)
+	   
+       #Сохраняем историю
+       done(user)
     end
 end
 

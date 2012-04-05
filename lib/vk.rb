@@ -218,11 +218,6 @@ module Vkontakte
     @@last_user_login
   end
 
-  @@transform_captcha = false
-  def transform_captcha=(value)
-    @@transform_captcha=value
-  end
-
   @@photo_mark_interval = 5
   def photo_mark_interval=(value)
     @@photo_mark_interval=value
@@ -317,9 +312,7 @@ module Vkontakte
     File.join(Vkontakte::application_directory,"loot")
   end
 
-  def convert_exe
-    File.join(Vkontakte::application_directory,"magick","convert.exe")
-  end
+
 
 
   #Used to upload files with non latin file names
@@ -346,7 +339,7 @@ module Vkontakte
 
   class Connect
     attr_reader :uid
-    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message, :able_to_invite_to_group, :able_to_invite_friend, :invite_box, :able_to_post_on_wall, :able_to_like, :able_to_post_on_custom_photo
+    attr_accessor :last_user_mark_photo, :last_user_like, :last_user_mail, :last_user_post, :last_user_invite, :able_to_send_message_to_friends, :able_to_send_message, :able_to_invite_to_group, :able_to_invite_friend, :invite_box, :able_to_post_on_wall, :able_to_like, :able_to_post_on_custom_photo
 
 
     def cookie
@@ -366,8 +359,9 @@ module Vkontakte
       @able_to_send_message = true
       @able_to_invite_to_group = true
       @able_to_invite_friend = true
-	    @able_to_post_on_wall = true
+	  @able_to_post_on_wall = true
       @able_to_post_on_custom_photo = true
+	  @able_to_send_message_to_friends = true
       @invite_box = {}
       new_agent
 
@@ -456,16 +450,12 @@ module Vkontakte
 
     def ask_captcha_internal(captcha_sid)
       file_name = save(addr("/captcha.php?sid=#{captcha_sid}"),"captcha","#{captcha_sid}.jpg",true)
-      if(@@transform_captcha)
-        file_name_png = file_name.gsub(".jpg",".png")
-        command = "\"#{Vkontakte::convert_exe}\" \"#{file_name}\" \"#{file_name_png}\""
-        system(command)
-      end
+
       captcha_key = ask_captcha(captcha_sid)
 
       begin
         File.delete file_name
-        File.delete file_name_png if(@@transform_captcha)
+
       rescue
       end
       captcha_key
@@ -859,7 +849,7 @@ module Vkontakte
   end
 
   class Group
-    attr_accessor :connect
+    attr_accessor :connect, :id_original
 
     include Vkontakte::PostMaker
 
@@ -934,6 +924,7 @@ module Vkontakte
 
     def set(id,name=nil,connect=nil)
       @id = id.to_s
+      @id_origignal = @id
       @name = name
       @connect = connect
       self
@@ -944,6 +935,10 @@ module Vkontakte
       @id = @id.to_s
       return @id if @id =~ /^\d+$/
       info
+      @id
+    end
+
+    def id_raw
       @id
     end
 
@@ -1197,7 +1192,7 @@ module Vkontakte
   end
 
   class User
-    attr_accessor :me, :connect
+    attr_accessor :me, :connect, :id_original
 
     include Vkontakte::PostMaker
 
@@ -1286,6 +1281,7 @@ module Vkontakte
 
     def set(id,name=nil,connect=nil)
       @id = id.to_s
+      @id_original = @id
       @name = name
       @connect = (connect)
       @me = false
@@ -1358,7 +1354,7 @@ module Vkontakte
         friends_json.map{|x,y| User.new.set(x.gsub('_',''),y[1],@connect)}
       else
         progress "List of friends #{@id}..."
-        @connect.silent_post('/al_friends.php', {"act" => "load_friends_silent","al" => "1","id"=>id,"gid"=>"0"}).map{|x| User.new.set(x[0],x[4],@connect)}
+        @connect.silent_post('/al_friends.php', {"act" => "load_friends_silent","al" => "1","id"=>id,"gid"=>"0"}).map{|x| u = User.parse(x[2]);u.connect = @connect; u.name =  x[5];u}
       end
     end
 	
@@ -1476,7 +1472,7 @@ module Vkontakte
     def mail(message, friends = true, attach_photo = nil, attach_video = nil, attach_music = nil, title = "",connector=nil)
       connect = forсe_login(connector,@connect)
 
-      return if(!friends && !connect.able_to_send_message)
+      return if(!friends && !connect.able_to_send_message || !connect.able_to_send_message_to_friends)
 
       if(connect.last_user_mail)
         diff = Time.new - connect.last_user_mail
@@ -1541,6 +1537,13 @@ module Vkontakte
           if captcha_sid.to_i == 8
             connect.able_to_send_message = false
             progress :able_to_send_message,connect
+            return nil
+          elsif captcha_sid.to_i == 11
+            connect.able_to_send_message = false
+			connect.able_to_send_message_to_friends = false
+            progress :phone_to_send_message,connect
+            return nil
+          elsif captcha_sid.length!=12
             return nil
           end
           captcha_key = connect.ask_captcha_internal(captcha_sid)

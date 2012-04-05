@@ -8,15 +8,18 @@ require '../lib/vk.rb'
 require '../lib/captcha.rb'
 require './sugar_vk.rb'
 require './logger_html.rb'
+require './sqlite_saver.rb'
+
 require './data.rb'
 require './users.rb'
+
 
 #database initialization
 data = RobotDatabase.new(File.join(File.expand_path("../.."),"data/data.db"))
 $db = data.db
 $mutex = Mutex.new
 $shared = File.expand_path("../../shared")
-
+$saver = SqliteSaver.new
 #vkontakte initialization
 
 include Vkontakte
@@ -44,17 +47,20 @@ log do |text|
 		end
 	}
 end
+
 progress do |*args|
 	if(args.length==1)
 		$mutex.synchronize{
 			$res<<{:text=>args[0],:type=>:progress, :id => Thread.current[:id]}
 		}
-	else
+  else
+
 		$mutex.synchronize{
 			$res<<{:text=>log_html(*args),:type=>:log, :id => Thread.current[:id]}
 		}
 	end
 end
+
 failed do |*args|
 	$res<<{:text=>args[0],:type=>:log, :id => Thread.current[:id]}
 end
@@ -125,7 +131,7 @@ def ask_text(str = "Введите текст")
 	ask(str => "text")[0]
 end
 
-def ask_peoples
+def ask_peoples(save_history = true)
   months = ["Не важно", "Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"]
   r = ask(
 	 {"tab" => {"data"=>{"Критерий(Имя или интерес)" => "string" ,
@@ -148,7 +154,7 @@ def ask_peoples
 	 "tab1" => {"data" => "USERLIST", "name" => "Прошлые поиски"},
 	 "tab2" => {"data" => {"Список людей\nВведите id людей по одному в каждой строке" => "text"}, "name" => "Список"}}
 	)
-
+  list_id = 0
 	case(r.last)
 		when 0 then
 
@@ -176,14 +182,31 @@ def ask_peoples
 
 
 		res = User.force_all(r[0],r[5],r[6],q)
+    list_id = res[1]
+    res = res[0]
+    Thread.current["history_list_id"] = $db[:history_list].insert(:date=>Time.now.strftime("%Y-%m-%d %H:%M"),:name=>Thread.current["name"].to_s,:list_id=>list_id) if save_history
 		when 1 then
+    res = r[0]["data"].map{|line| split = line.split(":"); User.new.set(split[0].gsub(/\s/,""),split[1],me.connect)}
+    list_id = r[0]["list_id"]
+    history_list_id = r[0]["history_list_id"]
 
-		res = r[0].map{|line| split = line.split(":"); User.new.set(split[0].gsub(/\s/,""),split[1],me.connect)}
-		when 2 then
+    if(history_list_id)
+      Thread.current["history_list_id"] = history_list_id
+    elsif(list_id)
+      Thread.current["history_list_id"] = $db[:history_list].insert(:date=>Time.now.strftime("%Y-%m-%d %H:%M"),:name=>Thread.current["name"].to_s,:list_id=>list_id)  if save_history
+    else
+      Thread.current["history_list_id"] = $db[:history_list].insert(:date=>Time.now.strftime("%Y-%m-%d %H:%M"),:name=>Thread.current["name"].to_s,:list_id=>0)  if save_history
+    end
+    when 2 then
+    list_id = $db[:list].insert(:name => "Список для задачи\n#{Thread.current["name"]}\nОт#{Time.now.strftime("%Y-%m-%d %H:%M")}") if save_history
+    res = r[0].split("\n").map{|x| split = x.split(":"); [split[0].gsub(/\s/,""),split[1],list_id]}
+    $db[:user].import([:id,:name,:list_id], res) if save_history
+    Thread.current["history_list_id"] = $db[:history_list].insert(:date=>Time.now.strftime("%Y-%m-%d %H:%M"),:name=>Thread.current["name"].to_s,:list_id=>list_id) if save_history
+    res = res.map{|a|User.new.set(a[0],a[1],me.connect)}
+  end
 
-		res = r[0].split("\n").map{|x| split = x.split(":"); User.new.set(split[0].gsub(/\s/,""),split[1],me.connect)}
 
-	end
+
 	res
 end
 
@@ -425,7 +448,7 @@ class User
     threads_search.each{|t|t.join}
     progress :search_end_progress,res.length
     res.each{|r| r.connect = (connector)? connector.connect : me.connect }
-    return res
+    return [res,list_id]
   end
 end
 
@@ -472,7 +495,7 @@ def update_options
 					Vkontakte.mail_interval = Settings["mail_interval"].to_f
 					Vkontakte.post_interval = Settings["post_interval"].to_f
 					Vkontakte.invite_interval = Settings["invite_interval"].to_f
-					Vkontakte.transform_captcha = Settings["captcha_solver"] == "0"
+
 					Vkontakte.user_login_interval = (Settings["login_interval"].nil?)? 4.0:Settings["login_interval"].to_f;
 			if(Settings["use_anonymizer"] == "true")
 			use_anonymizer
@@ -485,10 +508,6 @@ end
 
 update_options()
 
-#user functions
-def flush
-	TaskDatabase.flush
-end
 
 
 def sub(original,friend = nil)
@@ -531,10 +550,14 @@ def thread(*params)
 
 	thread = Thread.new(*params) do |*p|
 		Thread.stop
+		
 		yield(*p)
 	end
 	thread["id"] = Thread.current["id"]
 	thread["join"] = true
+	if(Thread.current["history_list_id"])
+		thread["history_list_id"] = Thread.current["history_list_id"]
+	end
 	sleep 0.1 while thread.status != 'sleep'
 	thread.wakeup
   thread
@@ -548,6 +571,63 @@ def join
 	end
 
 end
+
+#Reports, that action took place
+def done(id)
+   history_list_id = Thread.current["history_list_id"]
+  
+   #if done is called with no prepare filter
+   unless history_list_id
+    history_list_id = $db[:history_list].insert(:date=>Time.now.strftime("%Y-%m-%d %H:%M"),:name=>Thread.current["name"].to_s,:list_id=>0)
+    Thread.current["history_list_id"] = history_list_id
+   end
+	
+   object_id = id
+   case(id.class.name)
+     when /User/ then object_id = id.id_original
+     when /Group/ then object_id = id.id_original
+   end
+   $saver.add_to_history(object_id,history_list_id)if(object_id)
+
+
+
+end
+
+
+#List of available list, used for friends filtering
+def unfinished_lists
+  completed = $db[:history_item].join(:history_list, :id=>:history_list_id).group_and_count(:history_list_id).to_hash(:history_list_id,:count)
+  [{"caption" => "Начать с начала","data" => 0}] + $db[:history_list].filter(:list_id => 0).map{|h|{"caption" => "Продолжить задачу\n#{h[:name]}\nОт #{h[:date]}\nВыполнено #{completed[h[:id].to_i]}","data" => h[:id]}}
+end
+
+#Filter friends according to selected list id
+def filter(list,list_id)
+   list_id = Thread.current["history_list_id"] if Thread.current["history_list_id"]
+   #if filter is called with no prepare filter
+   if list_id.to_s == "0" 
+     history_list_id = $db[:history_list].insert(:date=>Time.now.strftime("%Y-%m-%d %H:%M"),:name=>Thread.current["name"].to_s,:list_id=>0)
+     Thread.current["history_list_id"] = history_list_id
+     return list
+   end
+   Thread.current["history_list_id"] = list_id
+   map = list.inject({}){|h,x|h[x.id_original] = x;h}
+   filter = $db[:history_item].filter(:history_list_id => list_id).map{|x| x[:object_id]}.to_a
+   all = list.map{|x|x.id_original}
+   res = all - filter
+   return res.map{|x|map[x]}
+end
+
+def prepare_filter(list_id)
+	unless(Thread.current["history_list_id"])
+		if(list_id.to_s == "0")
+			history_list_id = $db[:history_list].insert(:date=>Time.now.strftime("%Y-%m-%d %H:%M"),:name=>Thread.current["name"].to_s,:list_id=>0)
+			Thread.current["history_list_id"] = history_list_id
+		else
+			Thread.current["history_list_id"] = list_id
+		end
+	end
+end
+
 
 
 
@@ -645,6 +725,7 @@ loop do
       thread["id"] = task_json["id"]
       thread["user"] = task_json["user"]
       thread["name"] = task_json["name"]
+
       sleep 0.1 while thread.status != 'sleep'
       thread.wakeup
     elsif task_json["type"] == "stop"

@@ -2,7 +2,7 @@
 send_method = ["Написать на стене или в комментариях", "Написать на стене", "Написать в комментариях"]
 
 #Спросить, какое сообщение отправлять
-result_ask = ask_media("Сообщение.\n\n#{aviable_text_features}" => "text", "Отправлять на стену или в комментарии"=>{"Type" => "combo","Values" =>  send_method})
+result_ask = ask_media("Сообщение.\n\n#{aviable_text_features}" => "text", "Отправлять на стену или в комментарии"=>{"Type" => "combo","Values" =>  send_method}, "Продолжить задачу"=>{"Type" => "combo","Values" => unfinished_lists })
 message = result_ask[0][0]
 send_method_index = send_method.index(result_ask[0][1])
 
@@ -17,6 +17,8 @@ check_users do |user|
 		friends = safe{user.friends}
 
 		friends = [] unless friends
+		
+		friends = filter(friends,result_ask[0][2])
 		
 		total_all += friends.length
 
@@ -41,6 +43,8 @@ check_users do |user|
 				current_all += 1
 
 				total(current_all,total_all)
+				
+				done(friend)
 
 			end
 		

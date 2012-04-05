@@ -1,5 +1,8 @@
 #Спросить в какую группу вступать
-group_string = ask_string("Страница группы\nНапример http://vk.com/club3824963")
+res = ask("Страница группы\nНапример http://vk.com/club3824963" => "string", "Продолжить задачу"=>{"Type" => "combo","Values" => unfinished_lists })
+prepare_filter(res[1])
+group_string = res[0]
+
 group = Group.parse(group_string)
 
 "Друзья всех аккаунтов будут приглашены в группу #{group.pretty_string}".print
@@ -21,6 +24,8 @@ check_users do |user_out|
 				friends = safe{user.friends}
 
 				friends = [] unless friends
+
+				friends = filter(friends,res[1])
 		
 				total_all += friends.length
 			
@@ -35,6 +40,8 @@ check_users do |user_out|
 					total(current_all,total_all)
 					
 					break unless user.connect.able_to_invite_to_group
+					
+					done(friend)
 
 				end
 			end

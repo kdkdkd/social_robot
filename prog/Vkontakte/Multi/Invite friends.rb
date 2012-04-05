@@ -42,6 +42,9 @@ check_users do |user_out|
 				total(current,total_length)
 
 				break unless user.connect.able_to_invite_friend
+				
+				#Сохраняем историю
+				done(target)
 			end
 		end
 		user_continue

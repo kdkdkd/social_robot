@@ -57,6 +57,7 @@
 
      when :phone_invite_to_group then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} не может пригласить в группу из-за того, что телефон не привязан"
      when :phone_to_post then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} не может оставить запись из-за того, что телефон не привязан"
+     when :phone_to_send_message then res = "<img src = 'images/break.png'/>Пользователь #{args[1].email} не может написать сообщение из-за того, что телефон не привязан"
 
      when :search_divide_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов. разбиваю..."
      when :search_fit_progress then res = "<img src = 'images/search.png'/>Предварительный поиск дал #{args[1]} результатов."
