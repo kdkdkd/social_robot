@@ -1,7 +1,7 @@
 ﻿require "./data.rb"
 require "Qt"
 require 'qtwebkit'
-
+require "../lib/utfto1251.rb"
 
 class MultiBrowserTab < Qt::Widget
   slots 'url_changed ( const QUrl & )' , 'return_pressed()' , 'tab_changed()'
@@ -31,7 +31,13 @@ class MultiBrowserTab < Qt::Widget
   end
   
   def load_vk()
-	@webview.load(Qt::Url.new("http://vk.com/login.php?m=1&email=#{email}&pass=#{password}")) unless @loaded
+	unless @loaded
+		url = Qt::Url.new
+		array = Qt::ByteArray.new
+		array.append("http://vk.com/login.php?m=1&email=#{email}&pass=#{UtfToWin.new.urlencode(password)}")
+		url.setEncodedUrl(array)
+		@webview.load(url)
+	end
 	@loaded = true
   end
   

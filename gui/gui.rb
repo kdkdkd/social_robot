@@ -14,7 +14,7 @@ if(!File.exist?(File.join(File.expand_path("../.."),"ruby", "bin", "imageformats
 	label.setOpenExternalLinks(true)
 	widget.setWindowTitle("Обновление")
 	widget.resize(400, 250)
-	label.text = "В новой версии социального робота встроен браузер, <br>и обновлена версия руби, поэтому программу необходимо перекачать. <br><br> <a href='https://github.com/downloads/kdkdkd/social_robot/socialrobot.exe'>https://github.com/downloads/kdkdkd/social_robot/socialrobot.exe</a>"
+	label.text = "В новой версии социального робота встроен браузер, <br>и обновлена версия руби, поэтому программу необходимо перекачать. <br><a href='http://socialrobot.net/download/socialrobot.exe'>http://socialrobot.net/download/socialrobot.exe</a> <br><br>или<br><br> <a href='https://github.com/downloads/kdkdkd/social_robot/socialrobot.exe'>https://github.com/downloads/kdkdkd/social_robot/socialrobot.exe</a>"
 	label.setAlignment(Qt::AlignCenter)
 	widget.setCentralWidget(label)
 	widget.setWindowIcon(Qt::Icon.new("images/logo.png"))
@@ -62,7 +62,7 @@ class SocialRobot < Qt::MainWindow
 	def read
     Dir[File.join($shared,"*.in")].each do|file|
 
-      read_failed = true
+     read_failed = true
       while read_failed
         begin
           content = IO.read(file).force_encoding("UTF-8")
@@ -71,10 +71,15 @@ class SocialRobot < Qt::MainWindow
 
         end
       end
-      begin
-        FileUtils.rm_rf(file)
-      rescue
-      end
+      delete_failed = true
+      while delete_failed
+		  begin
+			FileUtils.rm_rf(file)
+			delete_failed = false
+		  rescue
+		  end
+	  end
+
 
       split = content.split("<!!MESSAGE!!>")
 
@@ -140,9 +145,9 @@ class SocialRobot < Qt::MainWindow
   	server_process = Qt::Process.new
 		server_process.start(ruby, [server_script])
 
-		@watcher = Qt::FileSystemWatcher.new
-    @watcher.addPath($shared)
-    connect(@watcher,SIGNAL("directoryChanged ( const QString & )"),self,SLOT("read()"))
+		timer_receive_messages=Qt::Timer.new(window)
+		connect(timer_receive_messages, SIGNAL("timeout()"), self, SLOT("read()"))
+		timer_receive_messages.start(1000)
 
 		setWindowTitle("Социальный робот. " + IO.read("../version.txt"))
 		setWindowIcon(Qt::Icon.new("images/logo.png"))
