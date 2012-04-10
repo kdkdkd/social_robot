@@ -49,11 +49,17 @@ class Element
 end
 
 
+
 class Browser < Qt::Widget
 
-	slots 'url_changed ( const QUrl & )','error_timeout()'
-	def error_timeout
-		raise 'Timeout'
+	slots 'url_changed ( const QUrl & )','stop()','timeout()'
+	
+	def stop
+		@webview.setHtml("stopped")
+	end
+	
+	def timeout
+		@webview.setHtml("timeout")
 	end
 
 	def url_changed(url)
@@ -67,6 +73,7 @@ class Browser < Qt::Widget
 		self.resize(800, 600)
 		@adress = Qt::LineEdit.new
 		@webview = Qt::WebView.new
+		
 		@layout = Qt::VBoxLayout.new
 		@progress = Qt::ProgressBar.new
 		@progress.setMaximum(100)
@@ -85,6 +92,15 @@ class Browser < Qt::Widget
 	end
 	
 	
+	def disable_images
+		@webview.page.settings.setAttribute(0,false)
+	end
+	
+	def set_proxy(server,port,user = "", password = "")
+		@webview.page.networkAccessManager.setProxy(Qt::NetworkProxy.new(3,server,port.to_i,user,password) ) 
+	end
+	
+	
 	
 	#Search your domain in google
 	def google(q,domain,lang)
@@ -99,7 +115,7 @@ class Browser < Qt::Widget
 				next_string = ">Next<"
 			end
 			return nil unless click_by_html(next_string)
-			sleep 2
+			self.sleep 5
 			depth += 1 
 			return nil if depth > 30
 		end
@@ -129,9 +145,15 @@ class Browser < Qt::Widget
 		res
 	end
 	
-	def click_any_link()
+	def click_any_link(number,sleep_time)
+		(number-1).times do
+			any_link = all_css('a').sample
+			any_link.click if(any_link)
+			self.sleep(sleep_time)
+		end
 		any_link = all_css('a').sample
 		any_link.click if(any_link)
+			
 	end
 	
 	def click_by_html(html)
@@ -162,6 +184,7 @@ class Browser < Qt::Widget
 	
 	
 	def load(url)
+		
 		@webview.load(Qt::Url.new(url))
 		wait
 		self
@@ -173,9 +196,19 @@ class Browser < Qt::Widget
 		
 		timer=Qt::Timer.new
 		Qt::Object.connect(timer, SIGNAL("timeout()"), loop, SLOT('quit()'))
-		Qt::Object.connect(timer, SIGNAL("timeout()"), self, SLOT('error_timeout()'))
-		timer.start(10000)
+		Qt::Object.connect(timer, SIGNAL("timeout()"), self, SLOT('timeout()'))
+		timer.start(30000)
 
+        loop.exec
+		timer.stop
+	end
+	
+	
+	def sleep(time_to_sleep)
+		loop = Qt::EventLoop.new
+		timer=Qt::Timer.new
+		Qt::Object.connect(timer, SIGNAL("timeout()"), loop, SLOT('quit()'))
+		timer.start(time_to_sleep * 1000)
         loop.exec
 	end
 end

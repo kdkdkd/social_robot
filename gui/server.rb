@@ -104,8 +104,10 @@ end
 #Create universal dialog
 def ask(params = {})
 	Thread.current["result_ask"] = nil
+	ask_hash = (0..32).map{(65+rand(25)).chr}.join
+	Thread.current["ask_hash"] = ask_hash
 	$mutex.synchronize{
-			$res<<{:hash=>params, :type=>:ask, :id => Thread.current[:id]}
+			$res<<{:hash=>params, :type=>:ask, :id => Thread.current[:id], :ask_hash => ask_hash}
 		}
 
 
@@ -731,8 +733,8 @@ loop do
     elsif task_json["type"] == "stop"
       Thread.list.each{|t| t.kill if t["id"].to_s == task_json["id"].to_s}
     elsif task_json["type"] == "ask"
-      thread = Thread.list.find{|t| t["id"].to_s == task_json["id"].to_s}
-      thread["result_ask"] = task_json["hash"]
+      thread = Thread.list.find{|t| t["ask_hash"].to_s == task_json["ask_hash"].to_s}
+      thread["result_ask"] = task_json["hash"] if thread
     elsif task_json["type"] == "update_options"
       update_options()
     elsif task_type["type"] == "exit"

@@ -27,6 +27,7 @@ end
 
 
 require './multibrowser.rb'
+require './autobrowser.rb'
 require './highlighter_ruby.rb'
 require 'pathname'
 
@@ -60,6 +61,7 @@ class SocialRobot < Qt::MainWindow
 
 
 	def read
+	@timer_receive_messages.stop
     Dir[File.join($shared,"*.in")].each do|file|
 
      read_failed = true
@@ -113,7 +115,7 @@ class SocialRobot < Qt::MainWindow
               t.progress_total = r["range"]
             elsif r["type"] == "ask"
               ask_res = ask(r["hash"])
-              send_data({:hash => ask_res,:id => r["id"], :type=> :ask})
+              send_data({:hash => ask_res,:id => r["id"], :type=> :ask, :ask_hash => r["ask_hash"]})
             end
           end
         end
@@ -121,6 +123,8 @@ class SocialRobot < Qt::MainWindow
 
 
 		end
+		@timer_receive_messages.start(1000)
+		
 	end
 	
 	def send_data(data)
@@ -145,9 +149,9 @@ class SocialRobot < Qt::MainWindow
   	server_process = Qt::Process.new
 		server_process.start(ruby, [server_script])
 
-		timer_receive_messages=Qt::Timer.new(window)
-		connect(timer_receive_messages, SIGNAL("timeout()"), self, SLOT("read()"))
-		timer_receive_messages.start(1000)
+		@timer_receive_messages=Qt::Timer.new(window)
+		connect(@timer_receive_messages, SIGNAL("timeout()"), self, SLOT("read()"))
+		@timer_receive_messages.start(1000)
 
 		setWindowTitle("Социальный робот. " + IO.read("../version.txt"))
 		setWindowIcon(Qt::Icon.new("images/logo.png"))
@@ -465,6 +469,19 @@ class SocialRobot < Qt::MainWindow
   def search_peoples
     run_script_by_name("../prog/Vkontakte/Peoples/Search peoples.rb")
   end
+  
+  def new_browser_tab(name,browser)
+	@all_tabs.addTab(browser,name)
+	h = Qt::PushButton.new
+    h.flat = true
+    h.setIcon(Qt::Icon.new("images/delete.png"))
+
+    @delete_buttons_tabs_hash[h] = browser
+    connect(h,SIGNAL("clicked(bool)"), self, SLOT("delete_button_click()"))
+    @all_tabs.tabBar.setTabButton(@all_tabs.tabBar.count - 1 ,1,h)
+	@all_tabs.currentIndex = @all_tabs.count - 1
+	
+  end
 
   def new_tab(name,task)
     #Create new tab
@@ -597,6 +614,10 @@ class SocialRobot < Qt::MainWindow
 				break
 			end
 		end
+		if(task.class.name.index("Browser"))
+			task.stop
+			return
+		end
 		task.state = "failed"
 		task.progress_text = "Остановлено пользователем"
 		Task.remove(task.id)
@@ -659,7 +680,8 @@ class SocialRobot < Qt::MainWindow
        @task_table.setCellWidget(i,3, h)
 
       
-		progress_text = (!t.progress_total ||t.state == "done")? "-":"#{t.progress_current} / #{t.progress_total}"
+		progress_text = #(!t.progress_total ||t.state == "done")? "-":
+		"#{t.progress_current} / #{t.progress_total}"
        
 
 
@@ -817,6 +839,11 @@ class SocialRobot < Qt::MainWindow
 	
 	#On run script clicked
 	def run_script_name(name = 'Новый скрипт')
+		s = @code_edit.plainText
+		s.force_encoding("UTF-8")
+		direct = s.index("start_browser")
+		
+	
 		name_save = name
 		if name!="Новый скрипт"
 		  begin
@@ -826,13 +853,18 @@ class SocialRobot < Qt::MainWindow
 			name = name_save
 		  end
 		end
+		
+		if(direct)
+			eval("script_name = '#{name}'\n#{s}")
+			return
+		end
 		#Create new tab
 		new_task = Task.new(name,nil)
 		log_edit = new_tab(name,new_task)
 
 
-		s = @code_edit.plainText
-		s.force_encoding("UTF-8")
+		
+		
 		email = @name_login_choose.currentText
 		email = "" unless email
 		email.force_encoding("UTF-8")
@@ -1110,6 +1142,25 @@ class SocialRobot < Qt::MainWindow
 		
 		@controls_hash[sender].text = filename
 		sender.parent.raise if sender.parent
+	end
+	
+	
+	def start_browser(hash)
+		b = Browser.new
+		name = hash[:windows_name] || "Авто браузер"
+		if(hash[:disable_images])
+			b.disable_images()
+		end
+		if(hash[:proxy_server] && hash[:proxy_port] && hash[:proxy_user] && hash[:proxy_password])
+			b.set_proxy(hash[:proxy_server], hash[:proxy_port], hash[:proxy_user], hash[:proxy_password])
+		elsif(hash[:proxy_server] && hash[:proxy_port])
+			b.set_proxy(hash[:proxy_server], hash[:proxy_port])
+		end
+		b.show_browser(name,self)
+		begin
+			yield b
+		rescue
+		end
 	end
 	
 
