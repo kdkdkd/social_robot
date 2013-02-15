@@ -34,7 +34,8 @@ class MultiBrowserTab < Qt::Widget
 	unless @loaded
 		url = Qt::Url.new
 		array = Qt::ByteArray.new
-		array.append("http://vk.com/login.php?m=1&email=#{email}&pass=#{UtfToWin.new.urlencode(password)}")
+		#array.append("http://vk.com/login.php?m=1&email=#{email}&pass=#{UtfToWin.new.urlencode(password)}")
+		array.append("http://login.vk.com/?act=login&email=#{email}&pass=#{UtfToWin.new.urlencode(password)}")
 		url.setEncodedUrl(array)
 		@webview.load(url)
 	end
